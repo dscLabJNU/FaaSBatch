@@ -1,8 +1,8 @@
 nodes:
-- worker_address: 10.2.64.8:8000
-  scale_limit: 120
-# - worker_address: 172.20.185.152:8000
-#   scale_limit: 120
+- worker_address: 172.17.8.101:8000
+  scale_limit: 20
+- worker_address: 172.17.8.102:8000
+  scale_limit: 20
 # - worker_address: 172.20.185.153:8000
 #   scale_limit: 120
 # - worker_address: 172.20.185.154:8000
