@@ -1,3 +1,4 @@
+import os
 COUCHDB_URL = 'http://openwhisk:openwhisk@10.0.0.103:5984/'
 REDIS_HOST = '127.0.0.1' # it serves to connect with the local redis, so it should be 127.0.0.1
 REDIS_PORT = 6379 # it follows the same configuration as created redis by docker (e.g., -p 6379:6379)
@@ -27,3 +28,5 @@ FUNCTION_INFO_ADDRS = {'genome': '../../benchmark/generator/genome', 'epigenomic
 DATA_MODE = 'raw' # raw, optimized
 CONTROL_MODE = 'WorkerSP' # WorkerSP, MasterSP
 CLEAR_DB_AND_MEM = True
+REQUEST_BATCHING = os.environ.get("REQUEST_BATCHING", "True") == 'True'
+STRATEGY = os.environ.get("STRATEGY", "Batching") # Batching, Fifer
