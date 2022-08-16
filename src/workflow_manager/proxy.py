@@ -84,10 +84,16 @@ def get_container_names():
     global container_names
     container_names = [container.attrs['Name'] for container in docker_client.containers.list()]
 
+def print_strategy_info():
+    if config.REQUEST_BATCHING:
+        print(f"Running proxy with strategy = {config.STRATEGY}")
+    else:
+        print(f"Running proxy with strategy = FaaSFlow")
 from gevent.pywsgi import WSGIServer
 import logging
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%H:%M:%S', level='INFO')
     server = WSGIServer((sys.argv[1], int(sys.argv[2])), app)
+    print_strategy_info()
     server.serve_forever()
     gevent.spawn_later(GET_NODE_INFO_INTERVAL)

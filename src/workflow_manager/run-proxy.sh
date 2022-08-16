@@ -27,5 +27,5 @@ if [[ $# -lt 1 ]]; then
     usage
 else
     check_ip $1
-sudo python3 proxy.py $1 8000
+python3 proxy.py $1 8000
 fi
