@@ -1,4 +1,4 @@
-docker build --no-cache -t fileprocessing_conversion ~/FaaSFlow/benchmark/fileprocessing/conversion
-docker build --no-cache -t fileprocessing_sentiment ~/FaaSFlow/benchmark/fileprocessing/sentiment
-docker build --no-cache -t fileprocessing_start ~/FaaSFlow/benchmark/fileprocessing/start
-docker build --no-cache -t fileprocessing_upload ~/FaaSFlow/benchmark/fileprocessing/upload
+docker build --no-cache -t fileprocessing_conversion ~/batching-request/benchmark/fileprocessing/conversion
+docker build --no-cache -t fileprocessing_sentiment ~/batching-request/benchmark/fileprocessing/sentiment
+docker build --no-cache -t fileprocessing_start ~/batching-request/benchmark/fileprocessing/start
+docker build --no-cache -t fileprocessing_upload ~/batching-request/benchmark/fileprocessing/upload

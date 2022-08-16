@@ -19,6 +19,7 @@ def generate_image(config_path, function_name, packages):
         requirements += " " + package
     with open(dockerfile_path, "w") as f:
         f.write("FROM workflow_base\n")
+        f.write('RUN sed -i "s@http://deb.debian.org@http://mirrors.aliyun.com@g" /etc/apt/sources.list')
         f.write('COPY main.py /exec/main.py\n')
         if requirements != "":
             f.write("RUN pip3 --no-cache-dir install{}".format(requirements))
