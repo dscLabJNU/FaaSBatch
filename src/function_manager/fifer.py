@@ -4,46 +4,10 @@ import gevent
 import numpy as np
 import time
 import copy
-update_interval = 10  # in s
+from request_recorder import HistoryDelay
 
-
-class HistoryDelay():
-    """Only stores the latency in last 10s!!!
-    """
-
-    def __init__(self) -> None:
-        self.history_delay = np.array([])
-        self.old_len = 0
-
-        gevent.spawn_later(update_interval, self.periodically_update_delay)
-
-    def periodically_update_delay(self):
-        gevent.spawn_later(update_interval, self.periodically_update_delay)
-
-        self.history_delay = np.delete(
-            self.history_delay, [x for x in range(self.old_len)])
-        self.old_len = len(self.history_delay)
-
-    def get_last10s_delay(self):
-        return self.get_mean()
-
-    def get_mean(self):
-        if len(self.history_delay) == 0:
-            return 0
-        return self.history_delay.mean()
-
-    def get_max(self):
-        if len(self.history_delay) == 0:
-            return 0
-        return self.history_delay.max()
-
-    def get_last(self):
-        if len(self.history_delay) == 0:
-            return 0
-        return self.history_delay[-1]
-
-    def append(self, value):
-        self.history_delay = np.append(self.history_delay, value)
+log_file = open(f"./time_comparation.csv", 'w')
+print("group_name,exec_time,cold_time", flush=True, file=log_file)
 
 
 class Fifer(FunctionGroup):
@@ -52,17 +16,14 @@ class Fifer(FunctionGroup):
         self.resp_latency = 0  # in ms
         self.containers = []
         self.batch_size = 0  # in number of request
-        self.cold_start_time = 0  # in ms
         self.slack = 0  # in ms
 
-        # Only stores the latency in last 10s
-        self.history_delay = HistoryDelay()
+        # Only stores the latency in last #HistoryDelay.update_interval seconds
+        self.time_exec = HistoryDelay()
+        self.time_cold = HistoryDelay()
 
     def send_request(self, function, request_id, runtime, input, output, to, keys):
-        start = time.time()
         res = super().send_request(function, request_id, runtime, input, output, to, keys)
-        delay = (time.time() - start) * 1000  # converts s to ms
-        self.history_delay.append(delay)
         return res
 
     def estimate_container(self) -> int:
@@ -87,15 +48,17 @@ class Fifer(FunctionGroup):
     def dynamic_reactive_scaling(self, function):
         """Create containers according to the Fifer strategy
         """
-        delay = self.history_delay.get_last10s_delay()
+        time_exec = self.time_exec.get_last10s_delay()
+        time_cold = self.time_cold.get_last10s_delay()
+        print(f"{self.name},{time_exec},{time_cold}", flush=True, file=log_file)
 
-        self.resp_latency = 5 * self.history_delay.get_max() or 1000  # in ms
-        self.slack = self.resp_latency - self.history_delay.get_last()
+        self.resp_latency = 5 * self.time_exec.get_max() or 1000  # in ms
+        self.slack = self.resp_latency - self.time_exec.get_last()
 
         print(
-            f"delay >= slack? {delay>=self.slack},delay = {delay}, slack = {self.slack}")
+            f"delay >= slack? {time_exec>=self.slack},delay = {time_exec}, slack = {self.slack}")
         num_containers = len(self.rq)
-        if delay >= self.slack:
+        if time_exec >= self.slack:
             num_containers = self.estimate_container()
 
         container_created = 0
@@ -103,7 +66,10 @@ class Fifer(FunctionGroup):
         while container_created != num_containers:
             container = self.self_container(function=function)
             while not container:
+                start = time.time()
                 container = self.create_container(function=function)
+                cold_start = (time.time() - start) * 1000  # converts s to ms
+                self.time_cold.append(cold_start)
             # the number of exec container hits limit
             if container is None:
                 self.num_processing -= 1
@@ -142,8 +108,11 @@ class Fifer(FunctionGroup):
             print(
                 f"Ready for batching request {req.function.info.function_name} in container {container.img_name}...")
 
+            start = time.time()
             res = container.send_request(req.data)
-            # res = {"res": 'ok'}
+            exec_delay = (time.time() - start) * 1000  # converts s to ms
+            self.time_exec.append(exec_delay)
+
             req.result.set(res)
             idx = (idx + 1) % len(self.candidate_containers)
 
