@@ -50,19 +50,27 @@ class Fifer(FunctionGroup):
         """
         time_exec = self.time_exec.get_last10s_delay()
         time_cold = self.time_cold.get_last10s_delay()
-        print(f"{self.name},{time_exec},{time_cold}", flush=True, file=log_file)
+        print(f"{self.name},{time_exec},{time_cold}",
+              flush=True, file=log_file)
 
         self.resp_latency = 5 * self.time_exec.get_max() or 1000  # in ms
         self.slack = self.resp_latency - self.time_exec.get_last()
 
         print(
             f"delay >= slack? {time_exec>=self.slack},delay = {time_exec}, slack = {self.slack}")
-        num_containers = len(self.rq)
+
+        """
+        We get or create $num_containers for handler $num_handle_rq.
+        self.rq may update during this procedure, thus we leave the remaining requests to be handled in next round
+        """
+        num_handle_rq = len(self.rq)
+        num_containers = num_handle_rq
+
         if time_exec >= self.slack:
             num_containers = self.estimate_container()
 
         container_created = 0
-
+        candidate_containers = []
         while container_created != num_containers:
             container = self.self_container(function=function)
             while not container:
@@ -75,26 +83,24 @@ class Fifer(FunctionGroup):
                 self.num_processing -= 1
                 return
 
-            self.candidate_containers.append(container)
+            candidate_containers.append(container)
             container_created += 1
+        return candidate_containers, num_handle_rq
 
     def dispatch_request(self, container=None):
         # no request to dispatch
         if len(self.rq) - self.num_processing == 0:
             return
         if len(self.rq) == 0:
-            return 0
+            return
         self.num_processing += 1
         function = self.rq[0].function
 
-        function_names = [rq.function.info.function_name for rq in self.rq]
-        print(
-            f"{self.name} has {len(function_names)} of function waiting to shedule: {function_names}")
-
         # Create containers according to Fifer strategy
-        self.dynamic_reactive_scaling(function=function)
-        print(
-            f"We now have {len(self.candidate_containers)} of candidate containers")
+        candidate_containers, num_handle_rq = self.dynamic_reactive_scaling(
+            function=function)
+        print(f"Recieved {len(self.rq)} of requests...")
+        print(f"There are {len(candidate_containers)} for {num_handle_rq} requests")
 
         idx = 0
         # Mapping requests to containers
@@ -103,10 +109,13 @@ class Fifer(FunctionGroup):
             print(
                 f"The length of rq in this {self.name} group is {len(self.rq)}")
 
+            if num_handle_rq == 0:
+                print("We handled enough number of requests")
+                return
+            num_handle_rq -= 1
             req = self.rq.pop(0)
-            container = self.candidate_containers[idx]
-            print(
-                f"Ready for batching request {req.function.info.function_name} in container {container.img_name}...")
+            container = candidate_containers[idx]
+            # print(f"Ready for batching request {req.function.info.function_name} in container {container.img_name}...")
 
             start = time.time()
             res = container.send_request(req.data)
@@ -114,6 +123,6 @@ class Fifer(FunctionGroup):
             self.time_exec.append(exec_delay)
 
             req.result.set(res)
-            idx = (idx + 1) % len(self.candidate_containers)
+            idx = (idx + 1) % len(candidate_containers)
 
             self.put_container(container)
