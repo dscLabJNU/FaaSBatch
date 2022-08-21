@@ -72,7 +72,7 @@ class WorkerSPManager:
         self.func = repo.get_current_node_functions(self.host_addr, self.info_db)
         
         self.function_manager = FunctionManager(function_info_addr, min_port)
-        min_port += 5000
+        min_port += 5456
 
     # return the workflow state of the request
     def get_state(self, request_id: str) -> WorkflowState:

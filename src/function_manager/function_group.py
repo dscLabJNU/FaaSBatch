@@ -53,7 +53,6 @@ class FunctionGroup():
 
         self.b = BoundedSemaphore()
         
-        self.cold_start_times = np.array([])
 
     # put the request into request queue
     def send_request(self, function, request_id, runtime, input, output, to, keys):
@@ -140,7 +139,6 @@ class FunctionGroup():
         # return None
         # self.num_exec += 1
         # self.b.release()
-        start = time.time()
         if len(self.candidate_containers) != 0:
             logging.info(
                 f"Get candidate container of function {function.info.function_name}")
@@ -163,8 +161,6 @@ class FunctionGroup():
         self.init_container(container, function)
         self.b.release()
 
-        cold_start_time = (time.time() - start) * 1000 # converts s to ms
-        self.cold_start_times = np.append(self.cold_start_times, cold_start_time)
         return container
 
     # do the function specific initialization work
@@ -176,7 +172,7 @@ class FunctionGroup():
     def put_container(self, container):
         self.b.acquire()
         self.container_pool.append(container)
-        print(f"There are {len(self.container_pool)} of containers in pool")
+        # print(f"There are {len(self.container_pool)} of containers in pool")
         self.num_exec -= 1
         self.b.release()
 
