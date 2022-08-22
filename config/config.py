@@ -29,4 +29,4 @@ DATA_MODE = 'raw' # raw, optimized
 CONTROL_MODE = 'WorkerSP' # WorkerSP, MasterSP
 CLEAR_DB_AND_MEM = True
 REQUEST_BATCHING = os.environ.get("request_batching", "True") == 'True'
-STRATEGY = os.environ.get("strategy", "Batching") # Batching, Fifer
+STRATEGY = os.environ.get("strategy", "Batching") # Batching, Fifer, Kraken

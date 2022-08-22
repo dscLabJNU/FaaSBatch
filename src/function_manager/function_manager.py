@@ -3,7 +3,8 @@ import docker
 import os
 from function_info import parse
 from function_group import FunctionGroup
-from my_batching import MyBatching
+from my_batching import Batching
+from kraken import Kraken
 from fifer import Fifer
 from port_controller import PortController
 from function import Function
@@ -49,7 +50,7 @@ class FunctionManager:
                 group_funcs_map[function_group] = []
             group_funcs_map[function_group].append(function)
         
-        group_instance = eval("MyBatching") if config.STRATEGY == 'Batching' else eval("Fifer")
+        group_instance = eval(config.STRATEGY)
         self.function_groups = {group_name: group_instance(name=group_name, functions=functions, 
                                                           docker_client=self.client, port_controller=self.port_controller)
                                 for group_name, functions in group_funcs_map.items()}

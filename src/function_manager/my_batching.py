@@ -6,7 +6,7 @@ import time
 import copy
 from request_recorder import HistoryDelay
 
-class MyBatching(FunctionGroup):
+class Batching(FunctionGroup):
     def __init__(self, name, functions, docker_client, port_controller) -> None:
         super().__init__(name, functions, docker_client, port_controller)
         self.resp_latency = 0  # in ms
