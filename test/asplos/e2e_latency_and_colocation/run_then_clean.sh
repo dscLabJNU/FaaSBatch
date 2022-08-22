@@ -4,6 +4,16 @@ function clean_monitor(){
     kill_resource_cmd="ps -ef | grep -v grep |grep -E 'monitor_resources' | awk '{print \$2}'| xargs kill -9"
     ssh dev-01 $kill_resource_cmd
     ssh dev-02 $kill_resource_cmd
+    # ssh dev-04 $kill_resource_cmd
+}
+
+function rm_utilization_log(){
+    strategy=$1
+    echo "Removing utilization log of strategy $strategy"
+    rm_utilization_log_cmd="rm -rf /home/vagrant/openwhisk-resource-monitor/utilization_$strategy.csv"
+    ssh dev-01 $rm_utilization_log_cmd
+    ssh dev-02 $rm_utilization_log_cmd
+
 }
 
 function clean_proxy(){
@@ -11,6 +21,7 @@ function clean_proxy(){
     kill_proxy_cmd="ps -ef | grep -v grep |grep -E 'python3 proxy.py' | awk '{print \$2}'| xargs kill -9"
     ssh dev-01 $kill_proxy_cmd
     ssh dev-02 $kill_proxy_cmd
+    # ssh dev-04 $kill_proxy_cmd
 }
 
 function run_monitor(){
@@ -18,6 +29,7 @@ function run_monitor(){
     run_monitor_cmd="cd ~/openwhisk-resource-monitor; nohup ./monitor_resources.sh > utilization_$strategy.csv &"
     ssh dev-01 $run_monitor_cmd
     ssh dev-02 $run_monitor_cmd
+    # ssh dev-04 $run_monitor_cmd
     echo "Run remote monitor processes done... now need to wait for 40 s"
 }
 
@@ -33,7 +45,7 @@ else
     strategy=$1
 
     clean_monitor
-
+    rm_utilization_log $strategy
     # 1. Run monitor before benchmarking
     run_monitor $strategy
     # sleep 40
