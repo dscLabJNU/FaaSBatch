@@ -5,7 +5,8 @@ from gevent import event
 from gevent.lock import BoundedSemaphore
 from container import Container
 from function_info import FunctionInfo
-
+log_file = open(f"./time_comparation_FaaSFlow.csv", 'w')
+print("group_name,function_name,exec_time,container_time", flush=True, file=log_file)
 # data structure for request info
 class RequestInfo:
     def __init__(self, request_id, data):
@@ -46,11 +47,13 @@ class Function:
         
         # 1. try to get a workable container from pool
         container = self.self_container()
-        
+        time_cold = 0
         # create a new container
         while container is None:
         # if container is None:
+            start = time.time()
             container = self.create_container()
+            time_cold = (time.time() - start) * 1000 # Coverts s to ms
            
         # the number of exec container hits limit
         if container is None:
@@ -61,7 +64,14 @@ class Function:
         self.num_processing -= 1
         # 2. send request to the container
         logging.info('send request to: %s of: %s, rq len: %d', self.info.function_name, req.request_id, len(self.rq))
+        start = time.time()
         res = container.send_request(req.data)
+        time_exec = (time.time() - start) * 1000 # Coverts s to ms
+        
+        function_name = self.info.function_name
+        group_name = '_'.join(function_name.split('_')[:-1]) or function_name
+        print(f"{group_name},{self.info.function_name},{time_exec},{time_cold}", file=log_file, flush=True)
+        
         req.result.set(res)
         
         # 3. put the container back into pool

@@ -6,7 +6,7 @@ import time
 import copy
 from request_recorder import HistoryDelay
 
-log_file = open(f"./time_comparation.csv", 'w')
+log_file = open(f"./time_comparation_Fifer.csv", 'w')
 print("group_name,exec_time,cold_time", flush=True, file=log_file)
 
 
