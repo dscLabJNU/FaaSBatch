@@ -115,15 +115,19 @@ class FunctionGroup():
     # if there's no container in pool, return None
     def self_container(self, function):
         res = None
-
+        print("Acquiring lock on self container")
         self.b.acquire()
+        print("Acquirrd ok")
+        print(f"Now the length of container pool is {len(self.container_pool) }")
         if len(self.container_pool) != 0:
             print('get container from pool of function: %s, pool size: %d',
                   function.info.function_name, len(self.container_pool))
 
             res = self.container_pool.pop(-1)
             self.num_exec += 1
+        print("Releasing lock on self container")
         self.b.release()
+        print("Released ok")
         return res
 
     # create a new container
@@ -145,9 +149,8 @@ class FunctionGroup():
             return self.candidate_containers.pop(-1)
 
         try:
-            self.b.acquire()
-            logging.info('create container of function: %s',
-                         function.info.function_name)
+            # self.b.acquire()
+            logging.info(f'create container of function: {function.info.function_name}',)
             container = Container.create(
                 self.client, function.info.img_name, self.port_controller.get(), 'exec')
             container.img_name = function.info.img_name
@@ -159,7 +162,7 @@ class FunctionGroup():
             self.num_exec -= 1
             return None
         self.init_container(container, function)
-        self.b.release()
+        # self.b.release()
 
         return container
 
@@ -179,8 +182,7 @@ class FunctionGroup():
     # after the destruction of container
     # its port should be give back to port manager
     def remove_container(self, container):
-        logging.info('remove container group: %s, pool size: %d',
-                     self.name, len(self.container_pool))
+        print(f'remove container group: {self.name}, pool size: {len(self.container_pool)}',)
         container.destroy()
         self.port_controller.put(container.port)
 
