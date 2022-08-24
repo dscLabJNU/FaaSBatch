@@ -43,9 +43,10 @@ class Container:
             gevent.sleep(0.005)
 
     # send a request to container and wait for result
-    def send_request(self, data = {}):
+    def send_request(self, data, queue):
         r = requests.post(base_url.format(self.port, 'run'), json=data)
         self.lasttime = time.time()
+        queue.put(r.json())
         return r.json()
 
     # initialize the container

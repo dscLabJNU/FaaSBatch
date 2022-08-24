@@ -1,10 +1,13 @@
 from copy import copy
+from queue import Queue
+import threading
 from function_group import FunctionGroup
 import gevent
 import numpy as np
 import time
 import copy
 from request_recorder import HistoryDelay
+
 
 class Batching(FunctionGroup):
     def __init__(self, name, functions, docker_client, port_controller) -> None:
@@ -19,10 +22,7 @@ class Batching(FunctionGroup):
         self.history_delay = HistoryDelay()
 
     def send_request(self, function, request_id, runtime, input, output, to, keys):
-        start = time.time()
         res = super().send_request(function, request_id, runtime, input, output, to, keys)
-        delay = (time.time() - start) * 1000  # converts s to ms
-        self.history_delay.append(delay)
         return res
 
     def estimate_container(self) -> int:
@@ -47,15 +47,7 @@ class Batching(FunctionGroup):
     def dynamic_reactive_scaling(self, function):
         """Create containers according to the strategy
         """
-        delay = self.history_delay.get_last10s_delay()
-
-        self.resp_latency = 5 * self.history_delay.get_max() or 1000  # in ms
-        self.slack = self.resp_latency - self.history_delay.get_last()
-
         num_containers = len(self.rq)
-        if delay >= self.slack:
-            num_containers = self.estimate_container()
-
         container_created = 0
 
         while container_created != num_containers:
@@ -100,8 +92,13 @@ class Batching(FunctionGroup):
             print(
                 f"Ready for batching request {req.function.info.function_name} in container {container.img_name}...")
 
-            res = container.send_request(req.data)
-            # res = {"res": 'ok'}
+            # res = container.send_request(req.data)
+            queue = Queue()
+            t = threading.Thread(
+                target=container.send_request, args=(req.data, queue))
+            t.start()
+            t.join()
+            res = queue.get()
             req.result.set(res)
             idx = (idx + 1) % len(self.candidate_containers)
 
