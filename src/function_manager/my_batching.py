@@ -7,7 +7,7 @@ import numpy as np
 import time
 import copy
 from request_recorder import HistoryDelay
-
+from thread import ThreadWithReturnValue
 
 class Batching(FunctionGroup):
     def __init__(self, name, functions, docker_client, port_controller) -> None:
@@ -47,7 +47,7 @@ class Batching(FunctionGroup):
     def dynamic_reactive_scaling(self, function, local_rq):
         """Create containers according to the strategy
         """
-        num_containers = len(local_rq)
+        num_containers = len(local_rq) // 2 or len(local_rq)
         container_created = 0
 
         # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
@@ -82,26 +82,24 @@ class Batching(FunctionGroup):
         # Create or get containers
         candidate_containers = self.dynamic_reactive_scaling(
             function=function, local_rq=local_rq)
-        print(
-            f"We now have {len(candidate_containers)} of candidate containers")
 
         idx = 0
         # Mapping requests to containers
+        c_r_mapping = {c: [] for c in candidate_containers}
         while local_rq:
-            print(
-                f"There are {len(local_rq)} of requests still need to handle")
             container = candidate_containers[idx]
-
             req = local_rq.pop(0)
-            self.rq.remove(req)
-            queue = Queue()
-            t = threading.Thread(
-                target=container.send_request, args=(req.data, queue))
-            t.start()
-            t.join()
-            res = queue.get()
-            # res = {"result": "ok"}
-            req.result.set(res)
+            self.rq.remove(req)  # ???
+            c_r_mapping[container].append(req)
             idx = (idx + 1) % len(candidate_containers)
 
+        threads = []
+        for c, reqs in c_r_mapping.items():
+            t = ThreadWithReturnValue(target=c.send_batch_requests, args=(reqs, ))
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            container = t.join()
+            print(f"The return container is {container}")
             self.put_container(container)

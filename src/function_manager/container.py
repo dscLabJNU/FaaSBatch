@@ -6,6 +6,7 @@ from docker.types import Mount
 
 base_url = 'http://127.0.0.1:{}/{}'
 
+
 class Container:
     # create a new container and return the wrapper
     @classmethod
@@ -43,15 +44,22 @@ class Container:
             gevent.sleep(0.005)
 
     # send a request to container and wait for result
-    def send_request(self, data, queue):
+    def send_request(self, data):
         r = requests.post(base_url.format(self.port, 'run'), json=data)
         self.lasttime = time.time()
-        queue.put(r.json())
         return r.json()
+
+    def send_batch_requests(self, requests):
+        print(
+            f"Batching {len(requests)} of requests to container {self.container.name}")
+        for req in requests:
+            res = self.send_request(data=req.data)
+            req.result.set(res)
+        return self
 
     # initialize the container
     def init(self, workflow_name, function_name):
-        data = { 'workflow': workflow_name, 'function': function_name }
+        data = {'workflow': workflow_name, 'function': function_name}
         r = requests.post(base_url.format(self.port, 'init'), json=data)
         self.lasttime = time.time()
         return r.status_code == 200
