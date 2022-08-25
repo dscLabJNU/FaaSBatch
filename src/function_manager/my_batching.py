@@ -44,10 +44,10 @@ class Batching(FunctionGroup):
 
         return num_containers
 
-    def dynamic_reactive_scaling(self, function):
+    def dynamic_reactive_scaling(self, function, local_rq):
         """Create containers according to the strategy
         """
-        num_containers = len(self.rq)
+        num_containers = len(local_rq)
         container_created = 0
 
         # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
@@ -66,33 +66,34 @@ class Batching(FunctionGroup):
         return candidate_containers
 
     def dispatch_request(self, container=None):
+        # Only process the request that req.processing == False
+        self.b.acquire()
+        local_rq = []
+        for req in self.rq:
+            if not req.processing:
+                req.processing = True
+                local_rq.append(req)
+        self.b.release()
         # no request to dispatch
-        if len(self.rq) - self.num_processing <= 0:
+        if len(local_rq) == 0:
             return
 
-        self.num_processing += len(self.rq)
-        print(f"{len(self.rq)} of requests are recieved")
-        print(f"{self.num_processing} of requests are processing")
-
-        function = self.rq[0].function
-
+        function = local_rq[0].function
         # Create or get containers
-        candidate_containers = self.dynamic_reactive_scaling(function=function)
+        candidate_containers = self.dynamic_reactive_scaling(
+            function=function, local_rq=local_rq)
         print(
             f"We now have {len(candidate_containers)} of candidate containers")
 
         idx = 0
         # Mapping requests to containers
-        while self.rq:
-            # self.rq.pop(0) shoud be in front of self.num_processing-=1
-            req = self.rq.pop(0)
-            self.num_processing -= 1
+        while local_rq:
             print(
-                f"The length of rq in this {self.name} group is {len(self.rq)}")
-            print(
-                f"There are {self.num_processing} of requests still need to handle")
+                f"There are {len(local_rq)} of requests still need to handle")
             container = candidate_containers[idx]
 
+            req = local_rq.pop(0)
+            self.rq.remove(req)
             queue = Queue()
             t = threading.Thread(
                 target=container.send_request, args=(req.data, queue))

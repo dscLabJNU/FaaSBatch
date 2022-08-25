@@ -22,6 +22,8 @@ class RequestInfo:
         self.data = data
         self.result = event.AsyncResult()
         self.arrival = time.time()
+        # True if request is being process
+        self.processing = False
 
 
 """
