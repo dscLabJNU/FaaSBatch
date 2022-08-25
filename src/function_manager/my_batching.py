@@ -50,56 +50,57 @@ class Batching(FunctionGroup):
         num_containers = len(self.rq)
         container_created = 0
 
+        # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
+        candidate_containers = []
+        print(f"We need {num_containers} of containers")
+
         while container_created != num_containers:
+            # container = self.fake_get_container(function=function)
             container = self.self_container(function=function)
             while not container:
                 container = self.create_container(function=function)
-            # the number of exec container hits limit
-            if container is None:
-                self.num_processing -= 1
-                return
-
-            self.candidate_containers.append(container)
+                # container = self.fake_create_container(function=function)
+            print(f"{container_created} of containers have been created")
+            candidate_containers.append(container)
             container_created += 1
+        return candidate_containers
 
     def dispatch_request(self, container=None):
         # no request to dispatch
-        if len(self.rq) - self.num_processing == 0:
+        if len(self.rq) - self.num_processing <= 0:
             return
-        if len(self.rq) == 0:
-            return 0
-        self.num_processing += 1
+
+        self.num_processing += len(self.rq)
+        print(f"{len(self.rq)} of requests are recieved")
+        print(f"{self.num_processing} of requests are processing")
+
         function = self.rq[0].function
 
-        function_names = [rq.function.info.function_name for rq in self.rq]
+        # Create or get containers
+        candidate_containers = self.dynamic_reactive_scaling(function=function)
         print(
-            f"{self.name} has {len(function_names)} of function waiting to shedule: {function_names}")
-
-        # Create containers according to Fifer strategy
-        self.dynamic_reactive_scaling(function=function)
-        print(
-            f"We now have {len(self.candidate_containers)} of candidate containers")
+            f"We now have {len(candidate_containers)} of candidate containers")
 
         idx = 0
         # Mapping requests to containers
         while self.rq:
+            # self.rq.pop(0) shoud be in front of self.num_processing-=1
+            req = self.rq.pop(0)
             self.num_processing -= 1
             print(
                 f"The length of rq in this {self.name} group is {len(self.rq)}")
-
-            req = self.rq.pop(0)
-            container = self.candidate_containers[idx]
             print(
-                f"Ready for batching request {req.function.info.function_name} in container {container.img_name}...")
+                f"There are {self.num_processing} of requests still need to handle")
+            container = candidate_containers[idx]
 
-            # res = container.send_request(req.data)
             queue = Queue()
             t = threading.Thread(
                 target=container.send_request, args=(req.data, queue))
             t.start()
             t.join()
             res = queue.get()
+            # res = {"result": "ok"}
             req.result.set(res)
-            idx = (idx + 1) % len(self.candidate_containers)
+            idx = (idx + 1) % len(candidate_containers)
 
             self.put_container(container)

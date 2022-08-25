@@ -48,8 +48,6 @@ class FunctionGroup():
 
         # 创建完毕并执行完请求的容器，用于接收后续请求
         self.container_pool = []
-        # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
-        self.candidate_containers = []
 
         self.b = BoundedSemaphore()
         
@@ -115,19 +113,15 @@ class FunctionGroup():
     # if there's no container in pool, return None
     def self_container(self, function):
         res = None
-        print("Acquiring lock on self container")
-        self.b.acquire()
-        print("Acquirrd ok")
         print(f"Now the length of container pool is {len(self.container_pool) }")
+        self.b.acquire()
         if len(self.container_pool) != 0:
             print('get container from pool of function: %s, pool size: %d',
                   function.info.function_name, len(self.container_pool))
 
             res = self.container_pool.pop(-1)
             self.num_exec += 1
-        print("Releasing lock on self container")
         self.b.release()
-        print("Released ok")
         return res
 
     # create a new container
@@ -143,10 +137,6 @@ class FunctionGroup():
         # return None
         # self.num_exec += 1
         # self.b.release()
-        if len(self.candidate_containers) != 0:
-            logging.info(
-                f"Get candidate container of function {function.info.function_name}")
-            return self.candidate_containers.pop(-1)
 
         try:
             # self.b.acquire()
@@ -154,9 +144,6 @@ class FunctionGroup():
             container = Container.create(
                 self.client, function.info.img_name, self.port_controller.get(), 'exec')
             container.img_name = function.info.img_name
-            logging.info(
-                f"Put candidate container of function {function.info.function_name} in to candidate_containers")
-            self.candidate_containers.append(container)
         except Exception as e:
             print(e)
             self.num_exec -= 1
@@ -174,6 +161,7 @@ class FunctionGroup():
     # put the container into one of the three pool, according to its attribute
     def put_container(self, container):
         self.b.acquire()
+        print(f"Put {container} into container pool")
         self.container_pool.append(container)
         # print(f"There are {len(self.container_pool)} of containers in pool")
         self.num_exec -= 1
