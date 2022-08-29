@@ -24,6 +24,7 @@ class RequestInfo:
         self.arrival = time.time()
         # True if request is being process
         self.processing = False
+        self.expect_time = -1  # Expect finish time
 
 
 """
@@ -52,9 +53,9 @@ class FunctionGroup():
         self.container_pool = []
 
         self.b = BoundedSemaphore()
-        
 
     # put the request into request queue
+
     def send_request(self, function, request_id, runtime, input, output, to, keys):
         data = {'request_id': request_id, 'runtime': runtime,
                 'input': input, 'output': output, 'to': to, 'keys': keys}
@@ -115,7 +116,8 @@ class FunctionGroup():
     # if there's no container in pool, return None
     def self_container(self, function):
         res = None
-        print(f"Now the length of container pool is {len(self.container_pool) }")
+        print(
+            f"Now the length of container pool is {len(self.container_pool) }")
         self.b.acquire()
         if len(self.container_pool) != 0:
             print('get container from pool of function: %s, pool size: %d',
@@ -142,7 +144,8 @@ class FunctionGroup():
 
         try:
             # self.b.acquire()
-            logging.info(f'create container of function: {function.info.function_name}',)
+            logging.info(
+                f'create container of function: {function.info.function_name}',)
             container = Container.create(
                 self.client, function.info.img_name, self.port_controller.get(), 'exec')
             container.img_name = function.info.img_name
@@ -172,7 +175,8 @@ class FunctionGroup():
     # after the destruction of container
     # its port should be give back to port manager
     def remove_container(self, container):
-        print(f'remove container group: {self.name}, pool size: {len(self.container_pool)}',)
+        print(
+            f'remove container group: {self.name}, pool size: {len(self.container_pool)}',)
         container.destroy()
         self.port_controller.put(container.port)
 

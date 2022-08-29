@@ -8,10 +8,10 @@ class HistoryDelay():
     Only stores the latency in last #self.update_interval seconds!!!
     """
 
-    def __init__(self) -> None:
+    def __init__(self, uptate_interval=10) -> None:
         self.history_delay = np.array([])
         self.old_len = 0
-        self.update_interval = 100  # in s
+        self.update_interval = uptate_interval  # in s
 
         gevent.spawn_later(self.update_interval,
                            self.periodically_update_delay)
@@ -44,4 +44,3 @@ class HistoryDelay():
 
     def append(self, value):
         self.history_delay = np.append(self.history_delay, value)
-

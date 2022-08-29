@@ -1,3 +1,4 @@
+from typing import Dict, List
 import requests
 import docker
 import time
@@ -49,13 +50,21 @@ class Container:
         self.lasttime = time.time()
         return r.json()
 
-    def send_batch_requests(self, requests):
+    def send_batch_requests(self, requests: List) -> Dict:
+        """Batching requests to a single container
+
+        Args:
+            requests (list): The batching requests
+
+        Returns:
+            dict: Return the container and its corresponding batching requests
+        """
         print(
             f"Batching {len(requests)} of requests to container {self.container.name}")
         for req in requests:
             res = self.send_request(data=req.data)
             req.result.set(res)
-        return self
+        return {"container": self, "requests": requests}
 
     # initialize the container
     def init(self, workflow_name, function_name):
