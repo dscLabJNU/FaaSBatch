@@ -24,7 +24,17 @@ class RequestInfo:
         self.arrival = time.time()
         # True if request is being process
         self.processing = False
-        self.expect_time = -1  # Expect finish time
+
+        self.start_ts = 0  # Timestamp as the execution started
+        self.end_ts = 0  # Timestamp as the exeuction end
+        self.expect_end_ts = 0  # Expected finish timestamp
+        self.defer = None  # Defer the expect_end_ts close to the end_ts
+
+    def get_waiting_time(self):
+        if self.start_ts > 0:
+            return self.start_ts - self.arrival
+        else:
+            raise ValueError("This request has not been executed")
 
 
 """

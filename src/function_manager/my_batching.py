@@ -1,17 +1,10 @@
-from copy import copy
-from queue import Queue
-import threading
 from typing import List
-from urllib import request
 from function_group import FunctionGroup
-import gevent
 import numpy as np
 import time
-import copy
-from function import Function
-from container import Container
 from request_recorder import HistoryDelay
 from thread import ThreadWithReturnValue
+import uuid
 
 
 class Batching(FunctionGroup):
@@ -23,65 +16,136 @@ class Batching(FunctionGroup):
         self.cold_start_time = 0  # in ms
         self.slack = 0  # in ms
 
-        # Only stores the latency in last 10s
-        self.history_delay = HistoryDelay()
-        self.time_exec = HistoryDelay(uptate_interval=np.inf)
-        self.time_cold = HistoryDelay(uptate_interval=np.inf)
-
+        self.history_duration = HistoryDelay(update_interval=np.inf)
+        self.time_cold = HistoryDelay(update_interval=np.inf)
+        self.defer_times = HistoryDelay(update_interval=np.inf)
         self.executing_rqs = []
+        self.historical_reqs = []
 
     def send_request(self, function, request_id, runtime, input, output, to, keys):
         res = super().send_request(function, request_id, runtime, input, output, to, keys)
         return res
 
-    def estimate_container(self) -> int:
-        """Estimates how many containers required
+    def gradual_adapt_defer(self, diff, predict_early):
+        """渐进适配defer，每一次加self.defer_times.get_mean()的1/i, i = 1, 2, 3 ...
+        Args:
+            diff (float): 预期结束时间戳和实际结束时间戳的差值
+            predict_early (bool): 预期结束时间戳早于实际结束时间戳
+        """
+        divide_factor = 1
+        defer = diff
+        while predict_early:
+            print(f"预计完成时间比实际完成时间{'早了'if defer<0 else '晚了'}{abs(defer)}")
+            if self.defer_times:
+                print(f"defer +={ self.defer_times.get_mean()/divide_factor}")
+                defer += self.defer_times.get_mean()/divide_factor
+            else:
+                print(f"defer += {0.2 / divide_factor} or 0.2")
+                defer += 0.2 / divide_factor or 0.2
+            predict_early = True if defer < 0 else False
+            divide_factor += 1
+            time.sleep(1)
 
+        # 恢复原来defer的意义
+        return defer - diff
+
+    def adjust_by_defer(self):
+
+        for history_req in self.historical_reqs:
+            diff = history_req.expect_end_ts - history_req.end_ts
+            print(f"diff = {history_req.expect_end_ts} - {history_req.end_ts}")
+            predict_early = True if diff < 0 else False
+
+            defer = self.gradual_adapt_defer(diff, predict_early)
+            if defer + diff > 0:
+                break
+
+        exp_end_times = [req.expect_end_ts for req in self.executing_rqs]
+        for req in self.executing_rqs:
+
+            req.defer = defer
+        return list(map(lambda x: x+defer, exp_end_times))
+
+    def analyze_history(self):
+        """Analyze the execution history and
+        get the expcted end times of all running requests
+
+        Returns:
+            List: expcted end times  of all running requests
+        """
+        if len(self.historical_reqs) == 0:
+            # print("This type of request has not been executed, can't analyze the history")
+            return None
+        # print(f"Now we analyzing the execution history...")
+        # print(
+            # f"History duration of {self.name}: {self.history_duration.values}")
+        std_duration = self.history_duration.get_std()
+        # Use ms as the unit of duration
+        if std_duration > 350:
+            # print(
+            # f"Historical data is too volatile, std of that is {std_duration}")
+            # 历史数据波动太大
+            return None
+
+        avg_duration = self.history_duration.get_mean()
+        exp_end_times = []
+        for req in self.executing_rqs:
+            if not req.start_ts:
+                print("req.start_ts == 0 shoud be never happend...")
+                exit(1)
+            req.expect_end_ts = req.start_ts + avg_duration
+            exp_end_times.append(req.expect_end_ts)
+        # Adjust defer factor by analyzing the diff between historical exp_end_time and end_ts
+        # exp_end_times = self.adjust_by_defer()
+
+        return exp_end_times
+
+    def estimate_container(self, local_rq) -> int:
+        """Estimates how many containers is required
         Returns:
             int: number of containers needed
         """
-        if len(self.containers) == 0:
-            return len(self.rq)
+        return len(local_rq) // 2 or len(local_rq)
 
-        total_delay = len(self.rq) * self.resp_latency
-
-        cur_req = len(self.containers) * self.batch_size
-
-        delay_factor = total_delay / cur_req  # divided by zero ???
-        if delay_factor > self.cold_start_times.mean():
-            num_containers = self.rq/cur_req
-
-        return num_containers
-
-    def wait_available_container(self, local_rq: List) -> List:
+    def wait_available_container(self, container_need) -> List:
         """Wait for other requests to end the container occupation
 
         Args:
-            timeout (int): We need a timeout to carry the QoS
-            start_waiting (time): The time we start to wait
-            function (Function): Function instance for creating container
             container_need (int): The number of containers needs to created
 
         Returns:
             List: Available containers
         """
-        print(f"There are {len(self.executing_rqs)} of requests running")
+        if not len(self.executing_rqs):
+            print(f"No running requests")
+            return []
+        # print(f"There are {len(self.executing_rqs)} of requests running")
+
+        # Predict the expec_end_ts of that running requests
+        exp_end_times = self.analyze_history()
         now = time.time()
-        finished = []
-        unfinished = []
-        for req in self.executing_rqs:
-            if req.expect_time < now:
-                finished.append(req)
-            else:
-                unfinished.append(req)
-        print(
-            f"It seems there are {len(finished)} of requests have been done, and now the num of avaiable container is {len(self.container_pool)}")
-        return []
+        if exp_end_times:
+            wait_time = max(list(map(lambda x: x-now, exp_end_times)))/1000
+            wait_time = 2
+            log_id = str(uuid.uuid4())
+            print(
+                f"In {log_id}: We believe that wait for {wait_time} seconds to get {len(exp_end_times)} of containers")
+            time.sleep(wait_time)
+            print(
+                f"In {log_id}: After wait {wait_time} seconds, the num of avaiable container is {len(self.container_pool)}")
+
+        candidata_containers = []
+        while self.container_pool:
+            candidata_containers.append(self.container_pool.pop(0))
+            if len(candidata_containers) == container_need:
+                break
+
+        return candidata_containers
 
     def dynamic_reactive_scaling(self, function, local_rq):
         """Create containers according to the strategy
         """
-        num_containers = len(local_rq)
+        num_containers = self.estimate_container(local_rq=local_rq)
         container_created = 0
 
         # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
@@ -101,13 +165,21 @@ class Batching(FunctionGroup):
         2. 根据历史执行时间，这些请求还有多久能释放容器
         3. 判断需要等待的时间，和冷启动时间比较
         """
-        print(
-            f"Still need more {num_containers-container_created} of containers")
-        self.wait_available_container(local_rq=local_rq)
+        container_need = num_containers - container_created
+        if container_need != 0:
+            print(f"Still need more {container_need} of containers")
+            avaiable_containers = self.wait_available_container(
+                container_need=container_need)
 
-        container = None
+            candidate_containers.extend(avaiable_containers)
+            container_created += len(avaiable_containers)
+            if len(avaiable_containers):
+                print(
+                    f"We get {len(avaiable_containers)} of containers by waiting execution")
+
         # 3. 创建剩下所需的容器
         while container_created < num_containers:
+            container = None
             while not container:
                 start = time.time()
                 container = self.create_container(function=function)
@@ -158,27 +230,29 @@ class Batching(FunctionGroup):
         threads = []
         for c, reqs in c_r_mapping.items():
             t = ThreadWithReturnValue(
-                target=c.send_batch_requests, args=(reqs, ))
+                target=c.send_batch_requests, args=(reqs, self.executing_rqs,))
             threads.append(t)
             t.start()
-            execute_time = time.time()
-
-            for i, req in enumerate(reqs):
-                # These requests are executed one by one because of batching
-                req.expect_time += execute_time * (i+1)
-                self.executing_rqs.append(req)
         return threads
 
     def finish_reqs(self, threads):
-        start = time.time()
         for t in threads:
             result = t.join()
-            time_exec = (time.time() - start) * 1000  # Coverts ms to s
-            self.time_exec.append(time_exec)
-            # print(f"The execution times of [group {self.name}] are {self.time_exec.history_delay}")
+            end_ts = time.time()
 
             container = result['container']
             requests = result['requests']
             for req in requests:
                 self.executing_rqs.remove(req)
+                req.end_ts = end_ts
+
+            self.record_info(req)
             self.put_container(container)
+
+    def record_info(self, req):
+        print(
+            f"request {req.function.info.function_name} is done, recording the execution infomation...")
+        self.historical_reqs.append(req)
+        self.history_duration.append(req.duration)
+        if req.defer:
+            self.defer_times.append(req.defer)

@@ -50,7 +50,7 @@ class Container:
         self.lasttime = time.time()
         return r.json()
 
-    def send_batch_requests(self, requests: List) -> Dict:
+    def send_batch_requests(self, requests: List, executing_rqs: List) -> Dict:
         """Batching requests to a single container
 
         Args:
@@ -62,8 +62,13 @@ class Container:
         print(
             f"Batching {len(requests)} of requests to container {self.container.name}")
         for req in requests:
+            executing_rqs.append(req)
+            req.start_ts = time.time()
             res = self.send_request(data=req.data)
+            req.end_ts = time.time()
             req.result.set(res)
+
+            req.duration = (req.end_ts - req.start_ts) * 1000
         return {"container": self, "requests": requests}
 
     # initialize the container
