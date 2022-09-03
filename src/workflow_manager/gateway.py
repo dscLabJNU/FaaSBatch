@@ -14,7 +14,7 @@ import config
 app = Flask(__name__)
 repo = Repository()
 
-def trigger_function(workflow_name, request_id, function_name):
+def trigger_function(workflow_name, request_id, function_name, duration=None):
     info = repo.get_function_info(function_name, workflow_name + '_function_info')
     ip = ''
     if config.CONTROL_MODE == 'WorkerSP':
@@ -26,11 +26,12 @@ def trigger_function(workflow_name, request_id, function_name):
         'request_id': request_id,
         'workflow_name': workflow_name,
         'function_name': function_name,
-        'no_parent_execution': True
+        'no_parent_execution': True,
+        'duration': duration
     }
     requests.post(url, json=data)
 
-def run_workflow(workflow_name, request_id):
+def run_workflow(workflow_name, request_id, duration):
     repo.create_request_doc(request_id)
 
     # allocate works
@@ -38,7 +39,7 @@ def run_workflow(workflow_name, request_id):
     start = time.time()
     jobs = []
     for n in start_functions:
-        jobs.append(gevent.spawn(trigger_function, workflow_name, request_id, n))
+        jobs.append(gevent.spawn(trigger_function, workflow_name, request_id, n, duration))
     gevent.joinall(jobs)
     end = time.time()
 
@@ -59,9 +60,10 @@ def run():
     data = request.get_json(force=True, silent=True)
     workflow = data['workflow']
     request_id = data['request_id']
+    duration = data.get('duration', None)
     logging.info('processing request ' + request_id + '...')
     repo.log_status(workflow, request_id, 'EXECUTE')
-    latency = run_workflow(workflow, request_id)
+    latency = run_workflow(workflow, request_id, duration)
     repo.log_status(workflow, request_id, 'FINISH')
     return json.dumps({'status': 'ok', 'latency': latency})
 

@@ -26,8 +26,8 @@ class Dispatcher:
     def get_state(self, workflow_name: str, request_id: str) -> WorkerSPManager:
         return self.managers[workflow_name].get_state(request_id)
 
-    def trigger_function(self, workflow_name, state, function_name, no_parent_execution):
-        self.managers[workflow_name].trigger_function(state, function_name, no_parent_execution)
+    def trigger_function(self, workflow_name, state, function_name, no_parent_execution, duration):
+        self.managers[workflow_name].trigger_function(state, function_name, no_parent_execution, duration)
     
     def clear_mem(self, workflow_name, request_id):
         self.managers[workflow_name].clear_mem(request_id)
@@ -48,10 +48,11 @@ def req():
     request_id = data['request_id']
     workflow_name = data['workflow_name']
     function_name = data['function_name']
+    duration = data.get('duration', None)
     no_parent_execution = data['no_parent_execution']
     # get the corresponding workflow state and trigger the function
     state = dispatcher.get_state(workflow_name, request_id)
-    dispatcher.trigger_function(workflow_name, state, function_name, no_parent_execution)
+    dispatcher.trigger_function(workflow_name, state, function_name, no_parent_execution, duration)
     return json.dumps({'status': 'ok'})
 
 @app.route('/clear', methods = ['POST'])

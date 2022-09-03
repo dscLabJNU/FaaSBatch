@@ -66,9 +66,9 @@ class FunctionGroup():
 
     # put the request into request queue
 
-    def send_request(self, function, request_id, runtime, input, output, to, keys):
+    def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         data = {'request_id': request_id, 'runtime': runtime,
-                'input': input, 'output': output, 'to': to, 'keys': keys}
+                'input': input, 'output': output, 'to': to, 'keys': keys, "duration": duration}
         req = RequestInfo(function, request_id, data)
         self.rq.append(req)
 

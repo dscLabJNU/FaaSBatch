@@ -112,17 +112,17 @@ class WorkerSPManager:
     # trigger the function when one of its parent is finished
     # function may run or not, depending on if all its parents were finished
     # function could be local or remote
-    def trigger_function(self, state: WorkflowState, function_name: str, no_parent_execution = False) -> None:
+    def trigger_function(self, state: WorkflowState, function_name: str, no_parent_execution = False, duration = None) -> None:
         func_info = self.get_function_info(function_name)
         if func_info['ip'] == self.host_addr:
             # function runs on local
-            self.trigger_function_local(state, function_name, no_parent_execution)
+            self.trigger_function_local(state, function_name, no_parent_execution, duration)
         else:
             # function runs on remote machine
-            self.trigger_function_remote(state, function_name, func_info['ip'], no_parent_execution)
+            self.trigger_function_remote(state, function_name, func_info['ip'], no_parent_execution, duration)
 
     # trigger a function that runs on local
-    def trigger_function_local(self, state: WorkflowState, function_name: str, no_parent_execution = False) -> None:
+    def trigger_function_local(self, state: WorkflowState, function_name: str, no_parent_execution = False, duration = None) -> None:
         logging.info('trigger local function: %s of: %s', function_name, state.request_id)
         state.lock.acquire()
         if not no_parent_execution:
@@ -132,12 +132,12 @@ class WorkerSPManager:
         if runnable:
             state.executed[function_name] = True
             state.lock.release()
-            self.run_function(state, function_name)
+            self.run_function(state, function_name, duration)
         else:
             state.lock.release()
 
     # trigger a function that runs on remote machine
-    def trigger_function_remote(self, state: WorkflowState, function_name: str, remote_addr: str, no_parent_execution = False) -> None:
+    def trigger_function_remote(self, state: WorkflowState, function_name: str, remote_addr: str, no_parent_execution = False, duration = None) -> None:
         logging.info('trigger remote function: %s on: %s of: %s', function_name, remote_addr, state.request_id)
         remote_url = 'http://{}/request'.format(remote_addr)
         data = {
@@ -145,6 +145,7 @@ class WorkerSPManager:
             'workflow_name': self.workflow_name,
             'function_name': function_name,
             'no_parent_execution': no_parent_execution,
+            "duration" : duration
         }
         response = requests.post(remote_url, json=data)
         response.close()
@@ -155,7 +156,7 @@ class WorkerSPManager:
         return state.parent_executed[function_name] == info['parent_cnt'] and not state.executed[function_name]
 
     # run a function on local
-    def run_function(self, state: WorkflowState, function_name: str) -> None:
+    def run_function(self, state: WorkflowState, function_name: str, duration = None) -> None:
         logging.info('run function: %s of: %s', function_name, state.request_id)
         # end functions
         if function_name == 'END':
@@ -172,7 +173,7 @@ class WorkerSPManager:
         elif function_name in self.merge_func:
             self.run_merge(state, info)
         else: # normal functions
-            self.run_normal(state, info)
+            self.run_normal(state, info, duration)
         
         # trigger next functions
         jobs = [
@@ -216,11 +217,11 @@ class WorkerSPManager:
         end = time.time()
         repo.save_latency({'request_id': state.request_id, 'function_name': info['function_name'], 'phase': 'all', 'time': end - start})
 
-    def run_normal(self, state: WorkflowState, info: Any) -> None:
+    def run_normal(self, state: WorkflowState, info: Any, duration=None) -> None:
         start = time.time()
         self.function_manager.run(info['function_name'], state.request_id,
                              info['runtime'], info['input'], info['output'],
-                             info['to'], {})
+                             info['to'], {}, duration)
         end = time.time()
         repo.save_latency({'request_id': state.request_id, 'function_name': info['function_name'], 'phase': 'all', 'time': end - start})
 

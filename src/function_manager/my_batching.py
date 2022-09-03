@@ -22,8 +22,8 @@ class Batching(FunctionGroup):
         self.executing_rqs = []
         self.historical_reqs = []
 
-    def send_request(self, function, request_id, runtime, input, output, to, keys):
-        res = super().send_request(function, request_id, runtime, input, output, to, keys)
+    def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
+        res = super().send_request(function, request_id, runtime, input, output, to, keys, duration)
         return res
 
     def gradual_adapt_defer(self, diff, predict_early):
@@ -74,16 +74,16 @@ class Batching(FunctionGroup):
             List: expcted end times  of all running requests
         """
         if len(self.historical_reqs) == 0:
-            # print("This type of request has not been executed, can't analyze the history")
+            print("This type of request has not been executed, can't analyze the history")
             return None
         # print(f"Now we analyzing the execution history...")
-        # print(
-            # f"History duration of {self.name}: {self.history_duration.values}")
+        print(
+            f"History duration of {self.name}: {self.history_duration.values}")
         std_duration = self.history_duration.get_std()
         # Use ms as the unit of duration
         if std_duration > 350:
-            # print(
-            # f"Historical data is too volatile, std of that is {std_duration}")
+            print(
+                f"Historical data is too volatile, std of that is {std_duration}")
             # 历史数据波动太大
             return None
 
@@ -119,7 +119,7 @@ class Batching(FunctionGroup):
         if not len(self.executing_rqs):
             print(f"No running requests")
             return []
-        # print(f"There are {len(self.executing_rqs)} of requests running")
+        print(f"There are {len(self.executing_rqs)} of requests running")
 
         # Predict the expec_end_ts of that running requests
         exp_end_times = self.analyze_history()
@@ -167,7 +167,7 @@ class Batching(FunctionGroup):
         """
         container_need = num_containers - container_created
         if container_need != 0:
-            print(f"Still need more {container_need} of containers")
+            print(f"Still need more {container_need} of containers in group {self.name}")
             avaiable_containers = self.wait_available_container(
                 container_need=container_need)
 

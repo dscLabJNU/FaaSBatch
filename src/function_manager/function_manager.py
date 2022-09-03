@@ -80,14 +80,15 @@ class FunctionManager:
             for function in self.functions.values():
                 gevent.spawn(function.dispatch_request)
     
-    def run(self, function_name, request_id, runtime, input, output, to, keys):
+    def run(self, function_name, request_id, runtime, input, output, to, keys, duration=None):
         # print('run', function_name, request_id, runtime, input, output, to, keys)
         if function_name not in self.functions:
-            raise Exception("No such function!")
+            print(f"There are functions {self.functions}")
+            raise Exception(f"No such {function_name} function!")
         
         group_name = extract_group_name(func_name=function_name)
         if config.REQUEST_BATCHING:
-            return self.function_groups[group_name].send_request(self.functions[function_name], request_id, runtime, input, output, to, keys)
+            return self.function_groups[group_name].send_request(self.functions[function_name], request_id, runtime, input, output, to, keys, duration)
         else:
             return self.functions[function_name].send_request(request_id, runtime, input, output, to, keys)
 
