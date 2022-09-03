@@ -12,7 +12,8 @@ WORKFLOW_YAML_ADDR = {'fileprocessing': '/home/vagrant/batching-request/benchmar
                   'cycles': '/home/vagrant/batching-request/benchmark/generator/cycles/flat_workflow.yaml',
                   'epigenomics': '/home/vagrant/batching-request/benchmark/generator/epigenomics/flat_workflow.yaml',
                   'genome': '/home/vagrant/batching-request/benchmark/generator/genome/flat_workflow.yaml',
-                  'soykb': '/home/vagrant/batching-request/benchmark/generator/soykb/flat_workflow.yaml'}
+                  'soykb': '/home/vagrant/batching-request/benchmark/generator/soykb/flat_workflow.yaml',
+                  'azure_bench_all': '/home/vagrant/batching-request/benchmark/generator/azure-bench/workflows/azure_bench_all/flat_workflow.yaml'}
 NETWORK_BANDWIDTH = 25 * 1024 * 1024 / 4 # 25MB/s / 4
 NET_MEM_BANDWIDTH_RATIO = 15 # mem_time = net_time / 15
 CONTAINER_MEM = 256 * 1024 * 1024 # 256MB
@@ -30,3 +31,4 @@ CONTROL_MODE = 'WorkerSP' # WorkerSP, MasterSP
 CLEAR_DB_AND_MEM = True
 REQUEST_BATCHING = os.environ.get("request_batching", "True") == 'True'
 STRATEGY = os.environ.get("strategy", "Batching") # Batching, Fifer, Kraken
+AZURE_DATA_DIR='/home/vagrant/data/Azure'

@@ -1,0 +1,7 @@
+workflow: azure_bench_00000292
+max_containers: 5
+functions:
+- image: azure-bench
+  name: azure_bench_00000292
+  qos_requirement: 0.95
+  qos_time: 100

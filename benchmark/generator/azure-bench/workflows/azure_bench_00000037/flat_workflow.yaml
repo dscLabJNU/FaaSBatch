@@ -1,0 +1,6 @@
+functions:
+- name: azure_bench_00000037
+  source: azure_bench_00000037
+  runtime: 1
+  scale: 3
+  mem_usage: 0.25
