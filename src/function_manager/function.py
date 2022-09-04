@@ -5,8 +5,8 @@ from gevent import event
 from gevent.lock import BoundedSemaphore
 from container import Container
 from function_info import FunctionInfo
-log_file = open(f"./time_comparation_FaaSFlow.csv", 'w')
-print("group_name,function_name,exec_time,container_time", flush=True, file=log_file)
+# log_file = open(f"./time_comparation_FaaSFlow.csv", 'w')
+# print("group_name,function_name,exec_time,container_time", flush=True, file=log_file)
 # data structure for request info
 class RequestInfo:
     def __init__(self, request_id, data):
@@ -70,7 +70,7 @@ class Function:
         
         function_name = self.info.function_name
         group_name = '_'.join(function_name.split('_')[:-1]) or function_name
-        print(f"{group_name},{self.info.function_name},{time_exec},{time_cold}", file=log_file, flush=True)
+        # print(f"{group_name},{self.info.function_name},{time_exec},{time_cold}", file=log_file, flush=True)
         
         req.result.set(res)
         

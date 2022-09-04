@@ -6,8 +6,8 @@ import time
 import copy
 from request_recorder import HistoryDelay
 
-log_file = open(f"./time_comparation_Fifer.csv", 'w')
-print("group_name,exec_time,cold_time", flush=True, file=log_file)
+# log_file = open(f"./time_comparation_Fifer.csv", 'w')
+# print("group_name,exec_time,cold_time", flush=True, file=log_file)
 
 
 class Fifer(FunctionGroup):
@@ -50,8 +50,7 @@ class Fifer(FunctionGroup):
         """
         time_exec = self.time_exec.get_last10s_delay()
         time_cold = self.time_cold.get_last10s_delay()
-        print(f"{self.name},{time_exec},{time_cold}",
-              flush=True, file=log_file)
+        # print(f"{self.name},{time_exec},{time_cold}",flush=True, file=log_file)
 
         self.resp_latency = 5 * self.time_exec.get_max() or 1000  # in ms
         self.slack = self.resp_latency - self.time_exec.get_last()
@@ -100,7 +99,8 @@ class Fifer(FunctionGroup):
         candidate_containers, num_handle_rq = self.dynamic_reactive_scaling(
             function=function)
         print(f"Recieved {len(self.rq)} of requests...")
-        print(f"There are {len(candidate_containers)} for {num_handle_rq} requests")
+        print(
+            f"There are {len(candidate_containers)} for {num_handle_rq} requests")
 
         idx = 0
         # Mapping requests to containers
