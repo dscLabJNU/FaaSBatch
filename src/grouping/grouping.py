@@ -1,4 +1,5 @@
 import sys
+import threading
 import parse_yaml
 import queue
 import component
@@ -7,7 +8,7 @@ import yaml
 
 sys.path.append('../../config')
 import config
-
+import customize_azure
 mem_usage = 0
 max_mem_usage = 0
 group_ip = {}
@@ -304,7 +305,14 @@ if __name__ == '__main__':
         node_info_dict[node_info['worker_address']] = node_info['scale_limit'] * 0.8
         
     workflow_pool = sys.argv[1:]
+    if 'azure_bench_all' in workflow_pool:
+        workflow_pool.remove('azure_bench_all')
+        workflow_pool.extend([app for app in customize_azure.AZURE_APPS])
+    threads = []
     for workflow_name in workflow_pool:
         workflow = parse_yaml.parse(workflow_name)
         node_info, function_info, function_info_raw, critical_path_functions = get_grouping_config(workflow, node_info_dict)
-        save_grouping_config(workflow, node_info, function_info, function_info_raw, critical_path_functions)
+        save_thread = threading.Thread(target=save_grouping_config, args = (workflow, node_info, function_info, function_info_raw, critical_path_functions,))
+        threads.append(save_thread)
+        # save_grouping_config(workflow, node_info, function_info, function_info_raw, critical_path_functions)
+    [t.start() for t in threads]
