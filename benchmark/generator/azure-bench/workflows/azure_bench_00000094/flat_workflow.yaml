@@ -1,6 +1,0 @@
-functions:
-- name: azure_bench_00000094
-  source: azure_bench_00000094
-  runtime: 1
-  scale: 3
-  mem_usage: 0.25

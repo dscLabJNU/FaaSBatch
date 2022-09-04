@@ -1,0 +1,23 @@
+workflow: azure_bench_app_00000039
+max_containers: 5
+functions:
+- image: azure-bench
+  name: azure_bench_func_00000100
+  qos_requirement: 0.95
+  qos_time: 100
+- image: azure-bench
+  name: azure_bench_func_00000116
+  qos_requirement: 0.95
+  qos_time: 100
+- image: azure-bench
+  name: azure_bench_func_00000117
+  qos_requirement: 0.95
+  qos_time: 100
+- image: azure-bench
+  name: azure_bench_func_00000118
+  qos_requirement: 0.95
+  qos_time: 100
+- image: azure-bench
+  name: azure_bench_func_00000119
+  qos_requirement: 0.95
+  qos_time: 100

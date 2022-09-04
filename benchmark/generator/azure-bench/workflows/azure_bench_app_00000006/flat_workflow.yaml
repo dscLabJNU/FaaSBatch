@@ -1,0 +1,21 @@
+functions:
+- name: azure_bench_func_00000015
+  source: azure_bench_func_00000015
+  runtime: 1
+  scale: 3
+  mem_usage: 0.25
+- name: azure_bench_func_00000078
+  source: azure_bench_func_00000078
+  runtime: 1
+  scale: 3
+  mem_usage: 0.25
+- name: azure_bench_func_00000133
+  source: azure_bench_func_00000133
+  runtime: 1
+  scale: 3
+  mem_usage: 0.25
+- name: azure_bench_func_00000289
+  source: azure_bench_func_00000289
+  runtime: 1
+  scale: 3
+  mem_usage: 0.25
