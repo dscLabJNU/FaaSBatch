@@ -3,3 +3,4 @@ __pycache__/
 *.asc
 .idea
 tmp/
+benchmark/generator/azure-bench/workflows/
