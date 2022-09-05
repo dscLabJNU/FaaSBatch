@@ -23,3 +23,7 @@ python3 ../benchmark/generator/translator.py
 ../benchmark/fileprocessing/create_image.sh
 ../benchmark/illgal_recognizer/create_image.sh
 ../benchmark/video/create_image.sh
+cd ../benchmark/generator/azure-bench
+python3 generator_trace.py
+python3 build_images.py
+cd -

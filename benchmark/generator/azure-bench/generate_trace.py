@@ -18,7 +18,7 @@ def parse_function_info(workflow_name, functions, function_info):
     function_info['workflow'] = workflow_name
     for func_name in functions:
         function_info['functions'].append({
-            "image": "azure-bench",
+            "image": func_name,
             "name": func_name,
             'qos_requirement': 0.95,
             'qos_time': 100
