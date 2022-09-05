@@ -5,6 +5,7 @@ import sys
 import json
 sys.path.append('../../../config')
 import config
+import customize_azure
 
 
 def parse_flat_workflow(functions, flat_workflow):
@@ -48,9 +49,11 @@ def generate_workflows(df):
         app_map_dict = json.load(load_f)
 
     for app, data in df.groupby('app'):
+        workflow_name = app_map_dict[app]
+        if workflow_name not in customize_azure.APPs:
+            continue
         flat_workflow = {'functions': []}
         function_info = {'workflow': "", 'max_containers': 5, 'functions': []}
-        workflow_name = app_map_dict[app]
         print(f'generating workflow {workflow_name}')
 
         functions = list(map(lambda x: func_map_dict[x], data['func'].unique()))
@@ -73,6 +76,7 @@ def process_and_dump(df):
 
 if __name__ == "__main__":
     data_dir = config.AZURE_DATA_DIR
+    # Do not change the csv file, cause different df incurs different mapper json files
     df = pd.read_csv(f"{data_dir}/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt")
     process_and_dump(df)
     generate_workflows(df)
