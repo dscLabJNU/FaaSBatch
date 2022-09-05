@@ -5,8 +5,6 @@ import sys
 import json
 sys.path.append('../../../config')
 import config
-import customize_azure
-
 
 def parse_flat_workflow(functions, flat_workflow):
     for func_name in functions:
@@ -33,14 +31,16 @@ def write_yamls(flat_workflow, function_info, workflow_name):
     if not os.path.exists(workflow_dir):
         os.makedirs(workflow_dir)
 
-    flat_workflow_yaml = open(f"{workflow_dir}/flat_workflow.yaml", 'w', encoding='utf-8')
+    flat_workflow_yaml = open(
+        f"{workflow_dir}/flat_workflow.yaml", 'w', encoding='utf-8')
     yaml.dump(flat_workflow, flat_workflow_yaml, sort_keys=False)
 
-    function_info_yaml = open(f"{workflow_dir}/function_info.yaml", 'w', encoding='utf-8')
+    function_info_yaml = open(
+        f"{workflow_dir}/function_info.yaml", 'w', encoding='utf-8')
     yaml.dump(function_info, function_info_yaml, sort_keys=False)
 
 
-def generate_workflows(df):
+def generate_workflows(df, workflow_names):
 
     with open("./func_mapper.json") as load_f:
         func_map_dict = json.load(load_f)
@@ -50,18 +50,21 @@ def generate_workflows(df):
 
     for app, data in df.groupby('app'):
         workflow_name = app_map_dict[app]
-        if workflow_name not in customize_azure.APPs:
+        if workflow_name not in workflow_names:
             continue
         flat_workflow = {'functions': []}
         function_info = {'workflow': "", 'max_containers': 5, 'functions': []}
         print(f'generating workflow {workflow_name}')
 
-        functions = list(map(lambda x: func_map_dict[x], data['func'].unique()))
+        functions = list(
+            map(lambda x: func_map_dict[x], data['func'].unique()))
         print(functions)
         flat_workflow = parse_flat_workflow(functions, flat_workflow)
-        function_info = parse_function_info(workflow_name, functions, function_info)
+        function_info = parse_function_info(
+            workflow_name, functions, function_info)
 
         write_yamls(flat_workflow, function_info, workflow_name)
+
 
 def process_and_dump(df):
     app_map = {app: f"azure_bench_app_{num+1:08}" for num,
@@ -74,9 +77,12 @@ def process_and_dump(df):
     with open("./app_mapper.json", 'w') as dump_f:
         dump_f.write(json.dumps(app_map))
 
+
 if __name__ == "__main__":
+    workflow_names = ['azure_bench_app_00000055']
     data_dir = config.AZURE_DATA_DIR
     # Do not change the csv file, cause different df incurs different mapper json files
-    df = pd.read_csv(f"{data_dir}/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt")
+    df = pd.read_csv(
+        f"{data_dir}/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt")
     process_and_dump(df)
-    generate_workflows(df)
+    generate_workflows(df, workflow_names)
