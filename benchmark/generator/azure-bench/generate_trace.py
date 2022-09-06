@@ -78,11 +78,15 @@ def process_and_dump(df):
         dump_f.write(json.dumps(app_map))
 
 
-if __name__ == "__main__":
-    workflow_names = ['azure_bench_app_00000055']
+if __name__ == "__main__":    
+    # Delete previous workflows
+    os.system("rm -rf ./workflows")
+    
     data_dir = config.AZURE_DATA_DIR
     # Do not change the csv file, cause different df incurs different mapper json files
     df = pd.read_csv(
         f"{data_dir}/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt")
     process_and_dump(df)
-    generate_workflows(df, workflow_names)
+    workflow_infos = yaml.load(open("./workflow_infos.yaml"), Loader=yaml.FullLoader)
+    for info in workflow_infos:
+        generate_workflows(df, info['workflow_names'])
