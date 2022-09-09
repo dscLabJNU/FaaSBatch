@@ -89,4 +89,9 @@ if __name__ == "__main__":
     process_and_dump(df)
     workflow_infos = yaml.load(open("./workflow_infos.yaml"), Loader=yaml.FullLoader)
     for info in workflow_infos:
+        """
+        We generate all functions for each workflow, 
+        meaning the number of functions may exceed that of the acutal invocked functions.
+        Because we invoke functions in a specific time range, thus may not be covered all functions. 
+        """
         generate_workflows(df, info['workflow_names'])

@@ -10,7 +10,9 @@ python3 couchdb_starter.py
 
 docker run -itd -p 6379:6379 --name redis redis
 cd -
-
+cd ../benchmark/generator/azure-bench/
+python3 generate_trace.py 
+cd -
 cd /home/vagrant/batching-request/src/grouping
 
 python3 grouping.py azure_bench_all video illgal_recognizer fileprocessing wordcount cycles epigenomics genome soykb

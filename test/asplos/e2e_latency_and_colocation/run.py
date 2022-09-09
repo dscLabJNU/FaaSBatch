@@ -11,6 +11,9 @@ import config
 import pandas as pd
 import time
 import gevent
+import yaml
+import customize_azure
+from azure import Azure
 
 repo = Repository()
 TEST_PER_WORKFLOW = 2 * 60
@@ -18,9 +21,15 @@ TEST_CORUN = 2 * 60
 TIMEOUT = 60
 e2e_dict = {}
 
-def run_workflow(workflow_name, request_id):
+def run_workflow(workflow_name, request_id, azure_data=None):
     url = 'http://' + config.GATEWAY_ADDR + '/run'
     data = {'workflow':workflow_name, 'request_id': request_id}
+    if azure_data:
+        data.update({
+                "azure_bench": True,
+                "duration":azure_data['duration'], 
+                "function_name": azure_data['function_name']
+                })
     try:
         rep = requests.post(url, json=data, timeout=TIMEOUT)
         return rep.json()['latency']
@@ -59,7 +68,31 @@ def analyze(mode, datamode):
     global e2e_dict
     workflow_pool = ['cycles', 'epigenomics', 'genome', 'soykb', 'video', 'illgal_recognizer', 'fileprocessing', 'wordcount']
     # workflow_pool = ['cycles', 'epigenomics', 'genome', 'soykb']
-    # workflow_pool = ['soykb']
+    workflow_pool = ['genome', 'genome', 'genome', 'genome', 'genome']
+    
+    if mode == 'azure_bench':
+        workflow_infos = yaml.load(open(f"{customize_azure.AZURE_BENCH_ADDR}/workflow_infos.yaml"), Loader=yaml.FullLoader)
+        workflow_info = workflow_infos[0]
+        azure = Azure(workflow_info)
+
+        df = azure.df
+        func_map_dict, app_map_dict = azure.load_mappers()
+        filter_df = azure.filter_df(app_map_dict)
+        
+        cnt = 0
+        jobs = []
+        print("Running Azure dataset...")
+        for i, row in filter_df.iterrows():
+            start_ts_sec, workflow_name, azure_data = prepare_invo_info(func_map_dict, app_map_dict, row)
+            jobs.append(gevent.spawn_later(start_ts_sec, run_workflow, workflow_name=workflow_name, request_id=str(uuid.uuid4()), azure_data=azure_data))
+            print(workflow_name)
+            cnt += 1
+            # if cnt == 10:
+                # break
+
+        print(cnt)
+        gevent.joinall(jobs)
+        return
     if mode == 'single':
         for workflow in workflow_pool:
             analyze_workflow(workflow, mode)
@@ -74,6 +107,21 @@ def analyze(mode, datamode):
         e2e_latencies.append(e2e_dict[workflow])
     df = pd.DataFrame({'workflow': workflow_pool, 'e2e_latency': e2e_latencies})
     df.to_csv(f'{datamode}_{mode}.csv')
+
+def prepare_invo_info(func_map_dict, app_map_dict, row):
+    invo_ts = row['invo_ts']
+    start_ts_sec = invo_ts.total_seconds() # in seconds
+    duration = row['duration']
+    function_name = func_map_dict[row["func"]]
+    workflow_name = app_map_dict[row['app']]
+    duration = 2.22551
+    azure_data = {
+                "function_name": function_name,
+                "duration": duration
+            }
+    # print(f"duration of {function_name} is {duration}")
+    print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec}")
+    return start_ts_sec,workflow_name,azure_data
 
 if __name__ == '__main__':
     opts, args = getopt.getopt(sys.argv[1:],'',['mode=', 'datamode='])
