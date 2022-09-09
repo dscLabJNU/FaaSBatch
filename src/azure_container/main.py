@@ -11,9 +11,11 @@ def look_busy():
     y = np.linspace(0, image.shape[0], orig.shape[0])
 
 
-def main():
-    # Make a fake image - you can use yours.
-    duration = globals().get('duration', 2)
+def main(args=None):
+    if not args:
+        duration = globals().get('duration', 2)
+    else:
+        duration = args.get('duration', 2)
     start = time.time()
 
     while time.time() - start < duration:

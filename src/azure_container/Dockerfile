@@ -11,7 +11,7 @@ RUN mkdir /proxy
 # copy libs
 COPY proxy.py /proxy/proxy.py
 COPY main.py /proxy/main.py
-
+COPY thread.py /proxy/thread.py
 WORKDIR /proxy
 
 # proxy server runs under port 5000

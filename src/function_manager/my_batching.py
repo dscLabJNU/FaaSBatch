@@ -105,7 +105,7 @@ class Batching(FunctionGroup):
         Returns:
             int: number of containers needed
         """
-        return len(local_rq) // 2 or len(local_rq)
+        return 1
 
     def wait_available_container(self, container_need) -> List:
         """Wait for other requests to end the container occupation
@@ -126,13 +126,13 @@ class Batching(FunctionGroup):
         now = time.time()
         if exp_end_times:
             wait_time = max(list(map(lambda x: x-now, exp_end_times)))/1000
-            wait_time = 2
+            # wait_time = 2
             log_id = str(uuid.uuid4())
             print(
                 f"In {log_id}: We believe that wait for {wait_time} seconds to get {len(exp_end_times)} of containers")
             time.sleep(wait_time)
             print(
-                f"In {log_id}: After wait {wait_time} seconds, the num of avaiable container is {len(self.container_pool)}")
+                f"In {log_id}: After wait {wait_time} seconds, the num of avaiable container is {len(self.container_pool)}, we expect {len(exp_end_times)} of containers")
 
         candidata_containers = []
         while self.container_pool:
@@ -219,6 +219,7 @@ class Batching(FunctionGroup):
     def map_and_run_rqs(self, local_rq, candidate_containers):
         idx = 0
         # Mapping requests to containers
+        print(f"Mapping {len(local_rq)} of requests to {len(candidate_containers)} of containers")
         c_r_mapping = {c: [] for c in candidate_containers}
         while local_rq:
             container = candidate_containers[idx]
@@ -237,6 +238,7 @@ class Batching(FunctionGroup):
 
     def finish_reqs(self, threads):
         for t in threads:
+            print(f"Finising thread {t}")
             result = t.join()
             end_ts = time.time()
 

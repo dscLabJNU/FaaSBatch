@@ -50,7 +50,7 @@ class Container:
         self.lasttime = time.time()
         return r.json()
 
-    def send_batch_requests(self, requests: List, executing_rqs: List) -> Dict:
+    def send_batch_requests(self, reqs: List, executing_rqs: List) -> Dict:
         """Batching requests to a single container
 
         Args:
@@ -60,16 +60,26 @@ class Container:
             dict: Return the container and its corresponding batching requests
         """
         print(
-            f"Batching {len(requests)} of requests to container {self.container.name}")
-        for req in requests:
+            f"Batching {len(reqs)} of requests to container {self.container.name}")
+        for req in reqs:
             executing_rqs.append(req)
             req.start_ts = time.time()
-            res = self.send_request(data=req.data)
-            req.end_ts = time.time()
+        #     res = self.send_request(data=req.data)
+        #     req.end_ts = time.time()
+        #     req.result.set(res)
+        #     req.duration = (req.end_ts - req.start_ts) * 1000
+        
+        d_list = list(map(lambda x: x.data, reqs))
+        r = requests.post(base_url.format(self.port, 'batch_run'), json=d_list)
+        print(f"Received {len(r.json())} of result of this batching")
+        for req in reqs:
+            request_id = req.request_id
+            res = r.json()[request_id]
             req.result.set(res)
-
+            req.end_ts = time.time()
             req.duration = (req.end_ts - req.start_ts) * 1000
-        return {"container": self, "requests": requests}
+            print(f"Result of request: {request_id} is {res}")
+        return {"container": self, "requests": reqs}
 
     # initialize the container
     def init(self, workflow_name, function_name):

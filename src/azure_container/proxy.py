@@ -1,10 +1,13 @@
 import os
+import threading
 import time
 from flask import Flask, request
 from gevent.pywsgi import WSGIServer
-
+from main import main as __main__
+from thread import ThreadWithReturnValue
 default_file = 'main.py'
 work_dir = '/proxy'
+work_dir = './'
 
 
 class Runner:
@@ -38,6 +41,11 @@ class Runner:
         end = time.time()
 
         return out
+
+    def batch_run(self, req, responses):
+        responses[req['request_id']] = __main__(req)
+        print("INVOKING")
+        # return {"request_id": req['request_id'], "out": __main__(req)}
 
 
 proxy = Flask(__name__)
@@ -83,6 +91,22 @@ def run():
 
     proxy.status = 'ok'
     return res
+
+
+@proxy.route('/batch_run', methods=['POST'])
+def batch_run():
+    responses = {}
+    proxy.status = 'run'
+    reqs = request.get_json(force=True, silent=True)
+    threads = []
+    for req in reqs:
+        t = threading.Thread(target=runner.batch_run,
+                             args=(req, responses))
+        threads.append(t)
+        t.start()
+    for t in threads:
+        t.join()
+    return responses
 
 
 if __name__ == '__main__':
