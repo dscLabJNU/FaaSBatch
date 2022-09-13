@@ -4,13 +4,14 @@
 FROM python:3.7-slim
 
 COPY pip.conf /etc/pip.conf
-RUN sed -i "s@http://deb.debian.org@http://mirrors.aliyun.com@g" /etc/apt/sources.list && rm -Rf /var/lib/apt/lists/* && apt-get update
+RUN sed -i "s@http://deb.debian.org@https://mirrors.ustc.edu.cn/@g" /etc/apt/sources.list && rm -Rf /var/lib/apt/lists/* && apt-get update
 # fulfill the structure requirement of proxy
 RUN mkdir /proxy
 
 # copy libs
 COPY proxy.py /proxy/proxy.py
 COPY main.py /proxy/main.py
+COPY thread.py /proxy/thread.py
 COPY Store.py /proxy/Store.py
 COPY container_config.py /proxy/container_config.py
 
