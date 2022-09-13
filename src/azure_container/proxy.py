@@ -106,6 +106,7 @@ def batch_run():
         t.start()
     for t in threads:
         t.join()
+    proxy.status = 'ok'
     return responses
 
 

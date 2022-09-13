@@ -79,6 +79,7 @@ class Container:
             req.end_ts = time.time()
             req.duration = (req.end_ts - req.start_ts) * 1000
             print(f"Result of request: {request_id} is {res}")
+        self.lasttime = time.time()
         return {"container": self, "requests": reqs}
 
     # initialize the container
