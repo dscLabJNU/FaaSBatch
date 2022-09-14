@@ -23,7 +23,8 @@ class Store:
         self.runtime = runtime
         if os.path.exists('work'):
             os.system('rm -rf work')
-        os.mkdir('work')
+        # os.mkdir('work')
+        os.system('mkdir -p work')
 
     def fetch_from_mem(self, k, redis_key, content_type):
         if content_type == 'application/json':
