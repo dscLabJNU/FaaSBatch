@@ -31,7 +31,7 @@ def trigger_function(workflow_name, request_id, function_name, duration=None):
     }
     requests.post(url, json=data)
 
-def run_workflow(workflow_name, request_id, duration):
+def run_workflow(workflow_name, request_id, duration=None):
     repo.create_request_doc(request_id)
 
     # allocate works
