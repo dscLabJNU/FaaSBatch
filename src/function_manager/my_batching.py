@@ -255,6 +255,6 @@ class Batching(FunctionGroup):
         print(
             f"request {req.function.info.function_name} is done, recording the execution infomation...")
         self.historical_reqs.append(req)
-        self.history_duration.append(req.duration)
+        self.history_duration.append(req.end_ts - req.start_ts)
         if req.defer:
             self.defer_times.append(req.defer)

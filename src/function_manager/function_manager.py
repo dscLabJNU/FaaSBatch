@@ -14,7 +14,7 @@ sys.path.append('../../config')
 import config
 
 repack_clean_interval = 5.000 # repack and clean every 5 seconds
-dispatch_interval = 0.005 # 200 qps at most
+dispatch_interval = 0.5 # 200 qps at most
 
 # the class for scheduling functions' inter-operations
 class FunctionManager:
