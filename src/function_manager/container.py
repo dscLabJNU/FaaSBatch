@@ -64,21 +64,29 @@ class Container:
         for req in reqs:
             executing_rqs.append(req)
             req.start_ts = time.time()
+            print(f"executing req: {req.function_id}")
         #     res = self.send_request(data=req.data)
         #     req.end_ts = time.time()
         #     req.result.set(res)
         #     req.duration = (req.end_ts - req.start_ts) * 1000
         
         d_list = list(map(lambda x: x.data, reqs))
+        print(f"data list is: {d_list}")
         r = requests.post(base_url.format(self.port, 'batch_run'), json=d_list)
         print(f"Received {len(r.json())} of result of this batching")
+        print(f"r.json() = {r.json()}")
         for req in reqs:
-            request_id = req.request_id
-            res = r.json()[request_id]
+            if len(r.json()) == 0:
+                # For some non-return functions
+                req.result.set({})
+                continue
+            print(f"receiving req: {req.function_id}")
+            function_id = req.function_id
+            res = r.json()[function_id]
             req.result.set(res)
             req.end_ts = time.time()
             req.duration = (req.end_ts - req.start_ts) * 1000
-            print(f"Result of request: {request_id} is {res}")
+            print(f"Result of request: {function_id} is {res}")
         self.lasttime = time.time()
         return {"container": self, "requests": reqs}
 

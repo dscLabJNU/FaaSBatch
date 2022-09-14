@@ -133,13 +133,14 @@ def run_single(inp, responses):
     output = inp['output']
     to = inp['to']
     keys = inp['keys']
+    function_id = inp['function_id']
 
     # record the execution time
     start = time.time()
     runner.run(request_id, runtime, input, output, to, keys)
     end = time.time()
 
-    responses[request_id] = {
+    responses[function_id] = {
         "start_time": start,
         "end_time": end,
         "duration": end - start,

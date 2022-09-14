@@ -2,6 +2,7 @@ import logging
 import queue
 import time
 import math
+import uuid
 from deprecated import deprecated
 from gevent import event
 from gevent.lock import BoundedSemaphore
@@ -16,7 +17,7 @@ Data structure for request info
 
 
 class RequestInfo:
-    def __init__(self, function, request_id, data):
+    def __init__(self, function, request_id, data, function_id):
         self.function = function
         self.request_id = request_id
         self.data = data
@@ -24,7 +25,7 @@ class RequestInfo:
         self.arrival = time.time()
         # True if request is being process
         self.processing = False
-
+        self.function_id = function_id
         self.start_ts = 0  # Timestamp as the execution started
         self.end_ts = 0  # Timestamp as the exeuction end
         self.expect_end_ts = 0  # Expected finish timestamp
@@ -67,9 +68,11 @@ class FunctionGroup():
     # put the request into request queue
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
+        function_id = function.info.function_name + "-" +str(uuid.uuid4())
         data = {'request_id': request_id, 'runtime': runtime,
-                'input': input, 'output': output, 'to': to, 'keys': keys, "duration": duration}
-        req = RequestInfo(function, request_id, data)
+                'input': input, 'output': output, 'to': to, 'keys': keys, "duration": duration,
+                "function_id": function_id}
+        req = RequestInfo(function, request_id, data, function_id)
         self.rq.append(req)
 
         # res = function.send_request(request_id, runtime, input, output, to, keys)
@@ -176,7 +179,7 @@ class FunctionGroup():
     # put the container into one of the three pool, according to its attribute
     def put_container(self, container):
         self.b.acquire()
-        print(f"Put {container} into container pool")
+        print(f"Put {container.container.name} into container pool")
         self.container_pool.append(container)
         # print(f"There are {len(self.container_pool)} of containers in pool")
         self.num_exec -= 1
