@@ -3,8 +3,8 @@ nodes:
   scale_limit: 60
 - worker_address: 10.0.0.102:8000
   scale_limit: 60
-# - worker_address: 10.0.0.104:8000
-#   scale_limit: 60
+- worker_address: 10.0.0.104:8000
+  scale_limit: 60
 # - worker_address: 172.20.185.153:8000
 #   scale_limit: 120
 # - worker_address: 172.20.185.154:8000
