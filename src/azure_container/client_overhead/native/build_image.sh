@@ -1,0 +1,1 @@
+docker build --no-cache . -t boto3-client-native

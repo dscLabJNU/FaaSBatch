@@ -10,15 +10,17 @@ def post_batch_run(reqs):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-concurrency", type=int, required=True, help="Concurrency of requests running in the same container")
+    parser.add_argument("-file", type=str, required=True, help="Log file name")
     args = parser.parse_args()
 
   
-    return args.concurrency
+    return args.concurrency, args.file
 
 
 if __name__ == "__main__":
 
-    concurrency = parse_args()
+    concurrency, log_file_name = parse_args()
+    log_file = open(log_file_name, 'a')
 
     threads = []
     reqs = [
@@ -32,4 +34,6 @@ if __name__ == "__main__":
     t.start()
     for t in threads:
         res = t.join()
-        print(res)
+    values = res.values()
+    for value in values:
+        print(f"{value['time_s3_create']},{value['mem_used']},{value['concurrency']}", file=log_file, flush=True)

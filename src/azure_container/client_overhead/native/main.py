@@ -1,4 +1,3 @@
-import numpy as np
 import time
 import os
 import psutil
@@ -32,11 +31,11 @@ def main(args=None):
         concurrency = globals()['concurrency']
     else:
         concurrency = args['concurrency']
-    log_file = open(f"./logs/s3_resource.csv", 'a')
+    # log_file = open(f"./logs/s3_resource.csv", 'a')
     
     mem_before = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
     _,_,_, time_s3_create = get_s3_instance({})
     mem = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024 - mem_before
-    print(f"{time_s3_create},{mem},{concurrency}", file=log_file, flush=True)
+    # print(f"{time_s3_create},{mem},{concurrency}", file=log_file, flush=True)
 
-    return {"res": "ok"}
+    return {"time_s3_create": time_s3_create, "mem_used": mem, "concurrency": concurrency}

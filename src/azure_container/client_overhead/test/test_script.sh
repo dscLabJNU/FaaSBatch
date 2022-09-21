@@ -1,10 +1,10 @@
 #!/bin/bash  
-
+mode=$1
 # kill proxy
 kill $(ps -ef | grep proxy.py | grep -v grep | awk '{print $2}')
 mkdir -p logs
 touch ./logs/s3_resource.csv
-echo "time(ms),memory(MB),concurrency" > ./logs/s3_resource.csv
+echo "time(ms),memory(MB),concurrency" > ../logs/s3_resource_$mode.csv
 for i in $(seq 1 5)
 do
     for concur in $(seq 1 10)

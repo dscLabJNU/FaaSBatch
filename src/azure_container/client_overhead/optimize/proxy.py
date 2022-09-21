@@ -4,7 +4,6 @@ import time
 from flask import Flask, request
 from gevent.pywsgi import WSGIServer
 from main import main as __main__
-from thread import ThreadWithReturnValue
 import aspectlib
 import boto3
 
