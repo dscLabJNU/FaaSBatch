@@ -5,6 +5,9 @@ from flask import Flask, request
 from gevent.pywsgi import WSGIServer
 from main import main as __main__
 from thread import ThreadWithReturnValue
+import aspectlib
+import boto3
+
 default_file = 'main.py'
 work_dir = '/proxy'
 work_dir = './'
@@ -48,8 +51,9 @@ class Runner:
         # exec(self.code, self.ctx)
         
         # run function
-        responses[req['request_id']] = __main__(req)
-        # responses[req['request_id']] = eval('main()', self.ctx)
+        with aspectlib.weave(boto3.Session, open_hook):
+            responses[req['request_id']] = __main__(req)
+            # responses[req['request_id']] = eval('main()', self.ctx)
         print("INVOKING")
         # return {"request_id": req['request_id'], "out": __main__(req)}
 
@@ -58,6 +62,29 @@ proxy = Flask(__name__)
 proxy.status = 'new'
 proxy.debug = False
 runner = Runner()
+
+result_dict = {}
+@aspectlib.Aspect
+def open_hook(*args, **kwargs):
+    """
+        The hash value of all input parameters as KEY,
+        and the output of the monitored function as VALUE.
+        The {KEY: VALUE} relationship is maintained by `result_dict`
+    """
+    # yield aspectlib.Return(s3)
+    combind_inputs = (args, tuple(sorted(kwargs.items())))
+    hash_args = hash(str(combind_inputs))
+    print(f"hash_args: {hash_args}")
+    if hash_args in result_dict:
+        print(f'cached result is {result_dict[hash_args]}')
+        yield aspectlib.Return(result_dict[hash_args])
+
+    result = yield aspectlib.Proceed
+
+    result_dict[hash_args] = result
+    print(f"the result is: {result}")
+    print(f"type of the result: {type(result)}")
+    yield aspectlib.Return(result)
 
 
 @proxy.route('/status', methods=['GET'])
@@ -106,6 +133,10 @@ def batch_run():
     proxy.status = 'run'
     reqs = request.get_json(force=True, silent=True)
     threads = []
+    # trigger socket client cache
+    first_req = reqs.pop(0)
+    runner.batch_run(first_req, responses)
+    
     for req in reqs:
         t = threading.Thread(target=runner.batch_run,
                              args=(req, responses))
