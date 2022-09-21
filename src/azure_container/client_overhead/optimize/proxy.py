@@ -51,7 +51,7 @@ class Runner:
         
         # run function
         with aspectlib.weave(boto3.Session, open_hook):
-            responses[req['request_id']] = __main__(req)
+            responses[req['function_id']] = __main__(req)
             # responses[req['request_id']] = eval('main()', self.ctx)
         print("INVOKING")
         # return {"request_id": req['request_id'], "out": __main__(req)}

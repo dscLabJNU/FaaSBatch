@@ -42,7 +42,7 @@ class Runner:
         return out
 
     def batch_run(self, req, responses):
-        responses[req['request_id']] = __main__(req)
+        responses[req['function_id']] = __main__(req)
         print("INVOKING")
         # return {"request_id": req['request_id'], "out": __main__(req)}
 
