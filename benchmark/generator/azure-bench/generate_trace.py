@@ -26,8 +26,8 @@ def parse_function_info(workflow_name, functions, function_info):
     return function_info
 
 
-def write_yamls(flat_workflow, function_info, workflow_name):
-    workflow_dir = f"./workflows/{workflow_name}"
+def write_yamls(flat_workflow, function_info, workflow_type, workflow_name):
+    workflow_dir = f"./{workflow_type}/{workflow_name}"
     if not os.path.exists(workflow_dir):
         os.makedirs(workflow_dir)
 
@@ -40,12 +40,12 @@ def write_yamls(flat_workflow, function_info, workflow_name):
     yaml.dump(function_info, function_info_yaml, sort_keys=False)
 
 
-def generate_workflows(df, workflow_names):
+def generate_workflows(df, workflow_names, workflow_type):
 
-    with open("./func_mapper.json") as load_f:
+    with open(f"./{workflow_type}/func_mapper.json") as load_f:
         func_map_dict = json.load(load_f)
 
-    with open("./app_mapper.json") as load_f:
+    with open(f"./{workflow_type}/app_mapper.json") as load_f:
         app_map_dict = json.load(load_f)
 
     for app, data in df.groupby('app'):
@@ -63,35 +63,46 @@ def generate_workflows(df, workflow_names):
         function_info = parse_function_info(
             workflow_name, functions, function_info)
 
-        write_yamls(flat_workflow, function_info, workflow_name)
+        write_yamls(flat_workflow, function_info, workflow_type, workflow_name)
 
 
-def process_and_dump(df):
+def process_and_dump(df, workflow_type, intensive, method):
     app_map = {app: f"azure_bench_app_{num+1:08}" for num,
                app in enumerate(df['app'].unique())}
-    func_map = {func: f"azure_bench_func_{num+1:08}" for num,
+    func_map = {func: f"azure_{intensive}_{method}_func_{num+1:08}" for num,
                 func in enumerate(df['func'].unique())}
-    with open("./func_mapper.json", 'w') as dump_f:
+    with open(f"./{workflow_type}/func_mapper.json", 'w') as dump_f:
         dump_f.write(json.dumps(func_map))
 
-    with open("./app_mapper.json", 'w') as dump_f:
+    with open(f"./{workflow_type}/app_mapper.json", 'w') as dump_f:
         dump_f.write(json.dumps(app_map))
 
 
-if __name__ == "__main__":    
-    # Delete previous workflows
-    os.system("rm -rf ./workflows")
-    
+intensive_dict = {"io": ["optimize", "native"],
+                  "cpu": ["native"]}
+if __name__ == "__main__":
     data_dir = config.AZURE_DATA_DIR
     # Do not change the csv file, cause different df incurs different mapper json files
     df = pd.read_csv(
         f"{data_dir}/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt")
-    process_and_dump(df)
-    workflow_infos = yaml.load(open("./workflow_infos.yaml"), Loader=yaml.FullLoader)
-    for info in workflow_infos:
-        """
-        We generate all functions for each workflow, 
-        meaning the number of functions may exceed that of the acutal invocked functions.
-        Because we invoke functions in a specific time range, thus may not be covered all functions. 
-        """
-        generate_workflows(df, info['workflow_names'])
+
+    # Delete previous workflows
+    os.system("rm -rf ./*workflows/")
+
+    for intensive, methods in intensive_dict.items():
+        for method in methods:
+            workflow_type = f"{intensive}_workflows/{method}"
+            os.system(f"mkdir -p {workflow_type}")
+
+            process_and_dump(df, workflow_type=workflow_type,
+                             intensive=intensive, method=method)
+            workflow_infos = yaml.load(
+                open("./workflow_infos.yaml"), Loader=yaml.FullLoader)
+            for info in workflow_infos:
+                """
+                We generate all functions for each workflow, 
+                meaning the number of functions may exceed that of the acutal invocked functions.
+                Because we invoke functions in a specific time range, thus may not be covered all functions. 
+                """
+                generate_workflows(
+                    df, info['workflow_names'], workflow_type=workflow_type)

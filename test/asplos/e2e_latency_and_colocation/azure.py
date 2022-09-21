@@ -17,9 +17,9 @@ class Azure:
         return df
 
     def load_mappers(self):
-        with open(f"{customize_azure.AZURE_BENCH_ADDR}/func_mapper.json") as load_f:
+        with open(f"{customize_azure.AZURE_WORKFLOWS_ADDR}/func_mapper.json") as load_f:
             func_map_dict = json.load(load_f)
-        with open(f"{customize_azure.AZURE_BENCH_ADDR}/app_mapper.json") as load_f:
+        with open(f"{customize_azure.AZURE_WORKFLOWS_ADDR}/app_mapper.json") as load_f:
             app_map_dict = json.load(load_f)
 
         return func_map_dict, app_map_dict
