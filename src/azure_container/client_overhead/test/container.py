@@ -15,7 +15,7 @@ class Container:
                                           detach=True,
                                           ports={'5000/tcp': str(port)},
                                           labels=['boto3-client'],
-                                          cpuset_cpus=str(cpu_num)
+                                        #   cpuset_cpus=str(cpu_num)
                                           )
         res = cls(container, port, attr)
         res.wait_start()

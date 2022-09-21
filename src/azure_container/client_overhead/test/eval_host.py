@@ -21,13 +21,13 @@ if "__main__" == __name__:
 
     args = parse_args()
     proxy_dir = f'../{args.mode}'
-    log_file_name = f"../logs/s3_resource_{args.mode}.csv"
+    log_file_name = f"../logs/boto3_host_{args.mode}.csv"
     log_file = open(log_file_name, "w")
     print("time(ms),memory(MB),concurrency", file=log_file, flush=True)
     os.system(
-        "sodu kill $(ps -ef | grep proxy.py | grep -v grep | awk '{print $2}')")
+        "sudo kill $(ps -ef | grep proxy.py | grep -v grep | awk '{print $2}')")
 
-    for i in range(1):
+    for i in range(5):
         for concur in range(1, 11):
             os.system(f"nohup python {proxy_dir}/proxy.py &")
             time.sleep(0.5)

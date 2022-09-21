@@ -54,10 +54,10 @@ if "__main__" == __name__:
 
     args = parse_args()
     image_name = f"boto3-client-{args.mode}"
-    log_file = open(f"../logs/boto3_client_{args.mode}.csv", "w")
+    log_file = open(f"../logs/boto3_container_{args.mode}.csv", "w")
     print("time(ms),memory(MB),concurrency", file=log_file, flush=True)
 
-    for i in range(1):
+    for i in range(5):
         # [1, 10]
         for concur in range(1, 11):
             # remove the labeled containers
@@ -65,6 +65,8 @@ if "__main__" == __name__:
                 'docker rm -f $(docker ps -aq --filter label=boto3-client) >/dev/null 2>&1')
 
             # the number of cores is used to map the vcpu of each container
+            # The performance gets worse if we dont map a specific vcpu
+            # we turn it off or on in container.py#Container@create
             container_pool = create_containers(
                 image_name=image_name, num_containers=1, num_cores=num_cores)
             print(f"Concurrency: {concur}")
