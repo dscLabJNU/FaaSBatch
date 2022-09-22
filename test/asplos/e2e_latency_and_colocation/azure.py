@@ -4,8 +4,9 @@ import json
 
 
 class Azure:
-    def __init__(self, workflow_info) -> None:
+    def __init__(self, workflow_info, azure_type) -> None:
         self.info = workflow_info
+        self.azure_type = azure_type
         self.df = self.load_df(day=self.info['azure_trace_day'])
 
     def load_df(self, day):
@@ -17,9 +18,9 @@ class Azure:
         return df
 
     def load_mappers(self):
-        with open(f"{customize_azure.AZURE_WORKFLOWS_ADDR}/func_mapper.json") as load_f:
+        with open(f"{customize_azure.AZURE_WORKFLOWS_ADDRS[self.azure_type]}/func_mapper.json") as load_f:
             func_map_dict = json.load(load_f)
-        with open(f"{customize_azure.AZURE_WORKFLOWS_ADDR}/app_mapper.json") as load_f:
+        with open(f"{customize_azure.AZURE_WORKFLOWS_ADDRS[self.azure_type]}/app_mapper.json") as load_f:
             app_map_dict = json.load(load_f)
 
         return func_map_dict, app_map_dict
@@ -35,7 +36,7 @@ class Azure:
         # 筛选出指定的 app
         print(f"Filtering apps: {azure_apps}")
         df = df[pd.Series(
-            list(map(lambda x: app_map_dict[x], df['app']))).isin(azure_apps)]
+            list(map(lambda x: '_'.join(app_map_dict[x].split("_")[:4]), df['app']))).isin(azure_apps)]
         if df['app'].nunique() != len(azure_apps):
             raise ValueError(
                 "The number of apps before and after filtering is not equal")

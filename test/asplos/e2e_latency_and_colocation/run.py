@@ -14,6 +14,8 @@ import gevent
 import yaml
 import customize_azure
 from azure import Azure
+import argparse
+import os
 
 repo = Repository()
 TEST_PER_WORKFLOW = 2 * 60
@@ -36,6 +38,12 @@ def run_workflow(workflow_name, request_id, azure_data=None):
     except Exception:
         print(f'{workflow_name} timeout')
         return 1000
+
+def analyze_azure_workflow(workflow_name, azure_data):
+    global e2e_dict
+    id = str(uuid.uuid4())
+    e2e_latency = run_workflow(workflow_name, id, azure_data)
+    e2e_dict[workflow_name] = e2e_latency
 
 def analyze_workflow(workflow_name, mode):
     global e2e_dict
@@ -64,16 +72,17 @@ def analyze_workflow(workflow_name, mode):
         print(f'{workflow_name} e2e_latency: ', e2e_latency)
         e2e_dict[workflow_name] = e2e_latency
 
-def analyze(mode, datamode):
+def analyze(mode, azure_type=None):
     global e2e_dict
     workflow_pool = ['cycles', 'epigenomics', 'genome', 'soykb', 'video', 'illgal_recognizer', 'fileprocessing', 'wordcount']
     # workflow_pool = ['cycles', 'epigenomics', 'genome', 'soykb']
-    workflow_pool = ['genome', 'genome', 'genome', 'genome', 'genome']
+    # workflow_pool = ['genome', 'genome', 'genome', 'genome', 'genome']
     
     if mode == 'azure_bench':
+        workflow_pool.clear()
         workflow_infos = yaml.load(open(f"{customize_azure.AZURE_BENCH_ADDR}/workflow_infos.yaml"), Loader=yaml.FullLoader)
         workflow_info = workflow_infos[0]
-        azure = Azure(workflow_info)
+        azure = Azure(workflow_info, azure_type)
 
         df = azure.df
         func_map_dict, app_map_dict = azure.load_mappers()
@@ -84,15 +93,14 @@ def analyze(mode, datamode):
         print("Running Azure dataset...")
         for i, row in filter_df.iterrows():
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(func_map_dict, app_map_dict, row)
-            jobs.append(gevent.spawn_later(start_ts_sec, run_workflow, workflow_name=workflow_name, request_id=str(uuid.uuid4()), azure_data=azure_data))
-            print(workflow_name)
+            jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow, workflow_name=workflow_name, azure_data=azure_data))
+            workflow_pool.append(workflow_name)
             cnt += 1
             # if cnt == 10:
                 # break
 
         print(cnt)
         gevent.joinall(jobs)
-        return
     if mode == 'single':
         for workflow in workflow_pool:
             analyze_workflow(workflow, mode)
@@ -106,7 +114,8 @@ def analyze(mode, datamode):
     for workflow in workflow_pool:
         e2e_latencies.append(e2e_dict[workflow])
     df = pd.DataFrame({'workflow': workflow_pool, 'e2e_latency': e2e_latencies})
-    df.to_csv(f'{datamode}_{mode}.csv')
+    csv_name = f"{mode}_{azure_type if mode == 'azure_bench' else 'normal'}.csv"
+    df.to_csv(csv_name)
 
 def prepare_invo_info(func_map_dict, app_map_dict, row):
     invo_ts = row['invo_ts']
@@ -114,22 +123,26 @@ def prepare_invo_info(func_map_dict, app_map_dict, row):
     duration = row['duration']
     function_name = func_map_dict[row["func"]]
     workflow_name = app_map_dict[row['app']]
-    duration = 2.22551
+    # duration = 2.22551
     azure_data = {
                 "function_name": function_name,
                 "duration": duration
             }
     # print(f"duration of {function_name} is {duration}")
-    print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec}")
+    print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
     return start_ts_sec,workflow_name,azure_data
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str, required=True, choices=[
+                        "single", "corun", "azure_bench"], help="Select the benchmark suite")
+        
+    parser.add_argument("--azure_type", type=str, required='azure_bench' in sys.argv, choices=[
+                        "cpu_native", "io_native", "io_optimize"], help="Select the intensive type in which azure_bench mode")
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    opts, args = getopt.getopt(sys.argv[1:],'',['mode=', 'datamode='])
+    args = parse_args()
     repo.clear_couchdb_results()
     repo.clear_couchdb_workflow_latency()
-    for name, value in opts:
-        if name == '--mode':
-            mode = value
-        elif name == '--datamode':
-            datamode = value
-    analyze(mode, datamode)
+    analyze(args.mode, args.azure_type)

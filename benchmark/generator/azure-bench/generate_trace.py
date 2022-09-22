@@ -50,7 +50,8 @@ def generate_workflows(df, workflow_names, workflow_type):
 
     for app, data in df.groupby('app'):
         workflow_name = app_map_dict[app]
-        if workflow_name not in workflow_names:
+        workflow_name_prefix = '_'.join(workflow_name.split("_")[:4])
+        if workflow_name_prefix not in workflow_names:
             continue
         flat_workflow = {'functions': []}
         function_info = {'workflow': "", 'max_containers': 5, 'functions': []}
@@ -67,9 +68,9 @@ def generate_workflows(df, workflow_names, workflow_type):
 
 
 def process_and_dump(df, workflow_type, intensive, method):
-    app_map = {app: f"azure_bench_app_{num+1:08}" for num,
+    app_map = {app: f"azure_bench_app_{num+1:08}_{intensive}_{method}" for num,
                app in enumerate(df['app'].unique())}
-    func_map = {func: f"azure_{intensive}_{method}_func_{num+1:08}" for num,
+    func_map = {func: f"azure_func_{num+1:08}_{intensive}_{method}" for num,
                 func in enumerate(df['func'].unique())}
     with open(f"./{workflow_type}/func_mapper.json", 'w') as dump_f:
         dump_f.write(json.dumps(func_map))

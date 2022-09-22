@@ -88,9 +88,9 @@ def get_container_names():
 
 def print_strategy_info():
     if config.REQUEST_BATCHING:
-        print(f"Running proxy with strategy = {config.STRATEGY}, azure_bench = {customize_azure.WORKFLOW_INDICATOR}")
+        print(f"Running proxy with strategy = {config.STRATEGY}")
     else:
-        print(f"Running proxy with strategy = FaaSFlow, azure_bench = {customize_azure.WORKFLOW_INDICATOR}")
+        print(f"Running proxy with strategy = FaaSFlow")
 from gevent.pywsgi import WSGIServer
 import logging
 if __name__ == '__main__':
