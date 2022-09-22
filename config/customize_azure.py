@@ -1,9 +1,10 @@
 import glob
+import os
 # Customize for Azure-bench
 
 AZURE_BENCH_ADDR = '/home/vagrant/batching-request/benchmark/generator/azure-bench'
 # Indicate the workflow you want to run
-WORKFLOW_INDICATOR = "cpu_native"
+WORKFLOW_INDICATOR = os.environ.get("azure_type", "cpu_native")
 AZURE_WORKFLOWS_ADDRS = {
     "cpu_native": f'{AZURE_BENCH_ADDR}/cpu_workflows/native',
     "io_native": f'{AZURE_BENCH_ADDR}/io_workflows/native',

@@ -7,6 +7,7 @@ from typing import Dict
 import sys
 sys.path.append('../../config')
 import config
+import customize_azure
 from workersp import WorkerSPManager
 from mastersp import MasterSPManager
 import docker
@@ -87,9 +88,9 @@ def get_container_names():
 
 def print_strategy_info():
     if config.REQUEST_BATCHING:
-        print(f"Running proxy with strategy = {config.STRATEGY}")
+        print(f"Running proxy with strategy = {config.STRATEGY}, azure_bench = {customize_azure.WORKFLOW_INDICATOR}")
     else:
-        print(f"Running proxy with strategy = FaaSFlow")
+        print(f"Running proxy with strategy = FaaSFlow, azure_bench = {customize_azure.WORKFLOW_INDICATOR}")
 from gevent.pywsgi import WSGIServer
 import logging
 if __name__ == '__main__':
