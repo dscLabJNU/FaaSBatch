@@ -132,6 +132,10 @@ def batch_run():
     proxy.status = 'run'
     reqs = request.get_json(force=True, silent=True)
     threads = []
+    # Identify the concurrency by myself
+    for req in reqs:
+        req['concurrency'] = len(reqs)
+
     # trigger socket client cache
     first_req = reqs.pop(0)
     runner.batch_run(first_req, responses)

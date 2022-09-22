@@ -99,6 +99,8 @@ def batch_run():
     reqs = request.get_json(force=True, silent=True)
     threads = []
     for req in reqs:
+        # Identify the concurrency by myself
+        req['concurrency'] = len(reqs)
         t = threading.Thread(target=runner.batch_run,
                              args=(req, responses))
         threads.append(t)
