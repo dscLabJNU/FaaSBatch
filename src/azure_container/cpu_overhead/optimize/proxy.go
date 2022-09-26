@@ -9,15 +9,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func parallel_exe(req map[string]string, wg *sync.WaitGroup, responses map[string]interface{}) {
+func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[string]interface{}) {
 	// 计数器减一
 	defer wg.Done()
-	responses[req["function_id"]] = run_main()
+	functionId, _ := req["function_id"].(string)
+	responses[functionId] = run_main()
 }
 
-func run(c *gin.Context) {
-	reqs := make([]map[string]string, 0)
+// This function executes serveral requests each time, in diffrerent threads
+func batch_run(c *gin.Context) {
+	reqs := make([]map[string]interface{}, 0)
 	c.BindJSON(&reqs)
+	log.Println("req: ", reqs)
 
 	// Aggreated results
 	responses := make(map[string]interface{}, len(reqs))
@@ -35,6 +38,19 @@ func run(c *gin.Context) {
 	c.JSON(http.StatusOK, responses)
 }
 
+// This function recieves one request each time
+func run(c *gin.Context) {
+	req := make(map[string]interface{}, 1)
+	c.BindJSON(&req)
+	log.Println("req: ", req)
+	responses := make(map[string]interface{}, 1)
+
+	value, _ := req["function_id"].(string)
+
+	responses[value] = run_main()
+	c.JSON(http.StatusOK, responses)
+}
+
 func stats(c *gin.Context) {
 	response := make(map[string]string)
 	response["workdir"], _ = os.Getwd()
@@ -47,7 +63,8 @@ func init_func(c *gin.Context) {
 
 func main() {
 	route := gin.Default()
-	route.POST("/batch_run", run)
+	route.POST("/run", run)
+	route.POST("/batch_run", batch_run)
 	route.GET("/status", stats)
 	route.POST("/init", init_func)
 
