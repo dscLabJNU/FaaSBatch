@@ -1,0 +1,1 @@
+go build && ./container-proxy
