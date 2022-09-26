@@ -80,7 +80,7 @@ def process_and_dump(df, workflow_type, intensive, method):
 
 
 intensive_dict = {"io": ["optimize", "native"],
-                  "cpu": ["native"]}
+                  "cpu": ["optimize","native"]}
 if __name__ == "__main__":
     data_dir = config.AZURE_DATA_DIR
     # Do not change the csv file, cause different df incurs different mapper json files
