@@ -4,6 +4,7 @@ import json
 
 AZURE_BENCH_ADDR = '/home/vagrant/batching-request/benchmark/generator/azure-bench'
 AZURE_WORKFLOWS_ADDRS = {
+    "cpu_optimize": f'{AZURE_BENCH_ADDR}/cpu_workflows/optimize',
     "cpu_native": f'{AZURE_BENCH_ADDR}/cpu_workflows/native',
     "io_native": f'{AZURE_BENCH_ADDR}/io_workflows/native',
     "io_optimize": f'{AZURE_BENCH_ADDR}/io_workflows/optimize',

@@ -15,7 +15,7 @@ python3 generate_trace.py
 cd -
 cd /home/vagrant/batching-request/src/grouping
 
-python3 grouping.py azure_bench_all video illgal_recognizer fileprocessing wordcount cycles epigenomics genome soykb
+python3 grouping.py azure_bench_all #video illgal_recognizer fileprocessing wordcount cycles epigenomics genome soykb
 
 
 cd -
