@@ -17,12 +17,12 @@ def get_workflow_type(workflow_path):
 
 
 def get_dockerfile_dir(workflow_type, m):
-    cpu_dockerfile = "../../../src/azure_container"
+    azure_container = "../../../src/azure_container"
+    method = m.split("/")[-1]
     if workflow_type == 'io':
-        method = m.split("/")[-1]
-        return f"{cpu_dockerfile}/client_overhead/{method}"
+        return f"{azure_container}/client_overhead/{method}"
     elif workflow_type == 'cpu':
-        return cpu_dockerfile
+        return f"{azure_container}/cpu_overhead/{method}"
 
 
 workflow_paths = glob.glob("./*workflows")
