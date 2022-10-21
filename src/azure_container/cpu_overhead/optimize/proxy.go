@@ -1,19 +1,74 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 )
 
-func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[string]interface{}) {
+type FibResult struct {
+	StartTime float64 `json:"start_time"`
+	Duration  float64 `json:"duration"`
+	EndTime   float64 `json:"end_time"`
+	Result    int     `json:"result"`
+}
+
+func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[string]interface{}, core string) {
 	// 计数器减一
 	defer wg.Done()
 	functionId, _ := req["function_id"].(string)
-	responses[functionId] = run_main()
+
+	// var schedParams = []string{"schedtool", "-N", "-a", core, "-e", "python3", "fib.py"}
+	var schedParams = []string{"schedtool", "-F", "-p", "20", "-a", core, "-e", "python3", "fib.py"}
+	if _, ok := req["input_n"]; ok {
+		inputN := strconv.Itoa(int(req["input_n"].(float64)))
+		schedParams = append(schedParams, inputN)
+		log.Printf("Runing python fip.py [%s] with schedtool in core %s \n", inputN, core)
+	}
+	log.Println("cmdParams:", schedParams)
+
+	// 指定 core 运行 python fib.py str(inpuN)
+	cmd := exec.Command("sudo", schedParams...)
+	out, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var fibResult FibResult
+	err = json.Unmarshal(out, &fibResult)
+	if err != nil {
+		log.Println("Failed because: ", err)
+	}
+	responses[functionId] = fibResult
+}
+
+func transferCoresInfo() []int {
+	pid := os.Getpid()
+	log.Println("Current pid:", pid)
+	cmd := exec.Command("taskset", "-p", strconv.Itoa(pid))
+
+	out, err := cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+	// log.Println("string(out): ", string(out))
+	outputSlice := strings.Split(string(out), ":")
+	// log.Println("outputSlice: ", outputSlice)
+	oxStr := strings.TrimSpace(outputSlice[len(outputSlice)-1])
+	cpuMask := new(big.Int)
+	cpuMask.SetString(oxStr, 16)
+
+	coreList := getCoresList(int(cpuMask.Int64()))
+	// log.Println("Avaiable cores: ", runtime.NumCPU())
+	return coreList
 }
 
 // This function executes serveral requests each time, in diffrerent threads
@@ -28,9 +83,13 @@ func batch_run(c *gin.Context) {
 
 	wg := &sync.WaitGroup{}
 
-	for _, req := range reqs {
+	coreList := transferCoresInfo()
+	log.Println("coreList:", coreList)
+	for i, req := range reqs {
+		core := strconv.Itoa(coreList[i%len(coreList)])
+		log.Printf("Assigning core %s to go-routine %d", core, i)
 		wg.Add(1)
-		go parallel_exe(req, wg, responses)
+		go parallel_exe(req, wg, responses, core)
 	}
 
 	// 当计数器为0时, 不再阻塞
@@ -62,6 +121,7 @@ func init_func(c *gin.Context) {
 }
 
 func main() {
+
 	route := gin.Default()
 	route.POST("/run", run)
 	route.POST("/batch_run", batch_run)
@@ -70,4 +130,10 @@ func main() {
 
 	// Listen and Server in 0.0.0.0:5000
 	route.Run(":5000")
+
+	// oxStr := "f"
+	// cpuMask := new(big.Int)
+	// cpuMask.SetString(oxStr, 16)
+	// coreList := getCoresList(int(cpuMask.Int64()))
+	// log.Println("coreList:", coreList)
 }

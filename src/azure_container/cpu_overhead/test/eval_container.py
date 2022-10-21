@@ -14,11 +14,12 @@ def create_containers(image_name, num_containers, num_cores):
     print(f"Creating {num_containers} of containers")
 
     for i in range(1, num_containers+1):
-        cpu_num = i % num_cores
         container_port = 8848 + i
+        bind_cpus = [i for i in range(num_cores)]
         # create the container
+        print(f"bind core {bind_cpus} to this container")
         container = Container.create(
-            client, image_name, container_port, 'exec', cpu_num)
+            client, image_name, container_port, 'exec', bind_cpus)
         # init the container
         # container.init()
         container_pool.append(container)
@@ -35,7 +36,7 @@ def parse_args():
 def invoke_requests(container_pool, concurrency, log_file=None):
     threads = []
     reqs = [
-        {"duration": 0.01, "function_id": str(id), "concurrency": concurrency} for id in range(1, concurrency+1)
+        {"duration": 0.01, "function_id": str(id), "concurrency": concurrency,"inpur_n": 31} for id in range(1, concurrency+1)
     ]
     for c in container_pool:
         t = ThreadWithReturnValue(
@@ -68,6 +69,6 @@ if "__main__" == __name__:
             # The performance gets worse if we dont map a specific vcpu
             # we turn it off or on in container.py#Container@create
             container_pool = create_containers(
-                image_name=image_name, num_containers=1, num_cores=num_cores)
+                image_name=image_name, num_containers=1, num_cores=concur)
             invoke_requests(container_pool, concurrency=concur, log_file=log_file)
             print(f"Currency: {concur}")
