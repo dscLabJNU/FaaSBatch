@@ -47,13 +47,11 @@ class Function:
         
         # 1. try to get a workable container from pool
         container = self.self_container()
-        time_cold = 0
+        
         # create a new container
         while container is None:
         # if container is None:
-            start = time.time()
             container = self.create_container()
-            time_cold = (time.time() - start) * 1000 # Coverts s to ms
            
         # the number of exec container hits limit
         if container is None:

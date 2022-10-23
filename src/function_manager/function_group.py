@@ -68,7 +68,7 @@ class FunctionGroup():
     # put the request into request queue
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
-        function_id = function.info.function_name + "-" +str(uuid.uuid4())
+        function_id = function.info.function_name + "-" + str(uuid.uuid4())
         data = {'request_id': request_id, 'runtime': runtime,
                 'input': input, 'output': output, 'to': to, 'keys': keys, "duration": duration,
                 "function_id": function_id}
@@ -142,7 +142,7 @@ class FunctionGroup():
         return res
 
     # create a new container
-    def create_container(self, function):
+    def create_container(self, function, bind_cpus=None):
         # do not create new exec container
         # when the number of execs hits the limit
         """ 暂时忽略scale limit
@@ -160,7 +160,7 @@ class FunctionGroup():
             logging.info(
                 f'create container of function: {function.info.function_name}',)
             container = Container.create(
-                self.client, function.info.img_name, self.port_controller.get(), 'exec')
+                self.client, function.info.img_name, self.port_controller.get(), 'exec', bind_cpus)
             container.img_name = function.info.img_name
         except Exception as e:
             print(e)

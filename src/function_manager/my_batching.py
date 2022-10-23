@@ -1,3 +1,5 @@
+import logging
+import multiprocessing
 from typing import List
 from function_group import FunctionGroup
 import numpy as np
@@ -5,9 +7,16 @@ import time
 from request_recorder import HistoryDelay
 from thread import ThreadWithReturnValue
 import uuid
+from core_manager import CoreManaerger
+num_cores = multiprocessing.cpu_count()
+# idel_cores = [i for i in range(num_cores)]
+core_manager = CoreManaerger(
+    available_cores=[str(i) for i in range(num_cores)])
 
 
 class Batching(FunctionGroup):
+    log_file_flag = False
+
     def __init__(self, name, functions, docker_client, port_controller) -> None:
         super().__init__(name, functions, docker_client, port_controller)
         self.resp_latency = 0  # in ms
@@ -16,14 +25,22 @@ class Batching(FunctionGroup):
         self.cold_start_time = 0  # in ms
         self.slack = 0  # in ms
 
-        self.history_duration = HistoryDelay(update_interval=np.inf)
+        self.history_duration = HistoryDelay(update_interval=np.inf)  # in ms
         self.time_cold = HistoryDelay(update_interval=np.inf)
         self.defer_times = HistoryDelay(update_interval=np.inf)
         self.executing_rqs = []
         self.historical_reqs = []
 
+        if not Batching.log_file_flag:
+            global log_file
+            log_file = open(
+                "./tmp/latency_amplification_my_batching.csv", 'w')
+            print(f"function,duration(ms)", file=log_file, flush=True)
+            Batching.log_file_flag = True
+
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
-        res = super().send_request(function, request_id, runtime, input, output, to, keys, duration)
+        res = super().send_request(function, request_id,
+                                   runtime, input, output, to, keys, duration)
         return res
 
     def gradual_adapt_defer(self, diff, predict_early):
@@ -146,6 +163,7 @@ class Batching(FunctionGroup):
         """Create containers according to the strategy
         """
         num_containers = self.estimate_container(local_rq=local_rq)
+        concurrency = len(local_rq)
         container_created = 0
 
         # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
@@ -155,27 +173,30 @@ class Batching(FunctionGroup):
         # 1. 先从container pool中获取尽量多可用的容器
         while len(self.container_pool) and container_created < num_containers:
             container = self.self_container(function=function)
+            # Update core-affinity list
+            # TODO 绑定CPU更慢？？
+            core_manager.shedule_cores(container, concurrency)
             candidate_containers.append(container)
             container_created += 1
 
         # 2. 如果容器数量不够，则等待至容器可用
-        """
-        TODO 还需要量化的等待可用容器带来的内存开销
-        1. 现在正在执行的请求，拥有这些请求开始的时间
-        2. 根据历史执行时间，这些请求还有多久能释放容器
-        3. 判断需要等待的时间，和冷启动时间比较
-        """
-        container_need = num_containers - container_created
-        if container_need != 0:
-            print(f"Still need more {container_need} of containers in group {self.name}")
-            avaiable_containers = self.wait_available_container(
-                container_need=container_need)
+        # """
+        # TODO 还需要量化的等待可用容器带来的内存开销
+        # 1. 现在正在执行的请求，拥有这些请求开始的时间
+        # 2. 根据历史执行时间，这些请求还有多久能释放容器
+        # 3. 判断需要等待的时间，和冷启动时间比较
+        # """
+        # container_need = num_containers - container_created
+        # if container_need != 0:
+        #     print(f"Still need more {container_need} of containers in group {self.name}")
+        #     avaiable_containers = self.wait_available_container(
+        #         container_need=container_need)
 
-            candidate_containers.extend(avaiable_containers)
-            container_created += len(avaiable_containers)
-            if len(avaiable_containers):
-                print(
-                    f"We get {len(avaiable_containers)} of containers by waiting execution")
+        #     candidate_containers.extend(avaiable_containers)
+        #     container_created += len(avaiable_containers)
+        #     if len(avaiable_containers):
+        #         print(
+        #             f"We get {len(avaiable_containers)} of containers by waiting execution")
 
         # 3. 创建剩下所需的容器
         while container_created < num_containers:
@@ -187,9 +208,12 @@ class Batching(FunctionGroup):
                 self.time_cold.append(cold_start)
                 # container = self.fake_create_container(function=function)
 
-            print(f"{container_created} of containers have been created")
+            # Update core-affinity list
+            core_manager.shedule_cores(container, concurrency)
             candidate_containers.append(container)
             container_created += 1
+            logging.info(
+                f"{container_created} of containers have been created")
         return candidate_containers
 
     def dispatch_request(self):
@@ -214,12 +238,14 @@ class Batching(FunctionGroup):
         threads = self.map_and_run_rqs(local_rq, candidate_containers)
 
         # Record exec time, remove running requests, and put container to pool
-        self.finish_reqs(threads)
+        # Note that one thread may contains several request results
+        self.finish_threads(threads)
 
     def map_and_run_rqs(self, local_rq, candidate_containers):
         idx = 0
         # Mapping requests to containers
-        print(f"Mapping {len(local_rq)} of requests to {len(candidate_containers)} of containers")
+        print(
+            f"Mapping {len(local_rq)} of requests to {len(candidate_containers)} of containers")
         c_r_mapping = {c: [] for c in candidate_containers}
         while local_rq:
             container = candidate_containers[idx]
@@ -236,25 +262,27 @@ class Batching(FunctionGroup):
             t.start()
         return threads
 
-    def finish_reqs(self, threads):
+    def finish_threads(self, threads):
         for t in threads:
             print(f"Finising thread {t}")
             result = t.join()
-            end_ts = time.time()
 
             container = result['container']
             requests = result['requests']
             for req in requests:
                 self.executing_rqs.remove(req)
-                req.end_ts = end_ts
-
-            self.record_info(req)
             self.put_container(container)
+
+            core_manager.release_busy_cores(container)
+            for req in requests:
+                self.record_info(req)
 
     def record_info(self, req):
         print(
             f"request {req.function.info.function_name} is done, recording the execution infomation...")
         self.historical_reqs.append(req)
-        self.history_duration.append(req.end_ts - req.start_ts)
+        self.history_duration.append(req.duration)
+        print(f"{req.function.info.function_name},{req.duration}",
+              file=log_file, flush=True)
         if req.defer:
             self.defer_times.append(req.defer)
