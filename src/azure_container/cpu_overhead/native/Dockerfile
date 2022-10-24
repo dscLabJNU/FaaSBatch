@@ -16,7 +16,18 @@ COPY . .
 RUN go build -o /app/proxy
 
 
-FROM scratch
+FROM ubuntu:20.04
+
+RUN  sed -i s@/archive.ubuntu.com/@/mirrors.aliyun.com/@g /etc/apt/sources.list
+RUN  apt-get clean
+
+RUN apt-get update && \
+    apt-get install -y schedtool && \
+    apt-get install -y util-linux && \
+    apt-get install -y python3
+# For running sudo schedtool 
+RUN apt-get install -y sudo
+
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /usr/share/zoneinfo/Asia/Shanghai /usr/share/zoneinfo/Asia/Shanghai
@@ -24,5 +35,6 @@ ENV TZ Asia/Shanghai
 
 WORKDIR /app
 COPY --from=builder /app/proxy /app/proxy
+COPY fib.py /app/
 
 CMD ["./proxy"]
