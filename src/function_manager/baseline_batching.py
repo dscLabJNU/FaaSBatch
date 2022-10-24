@@ -7,9 +7,21 @@ import time
 from request_recorder import HistoryDelay
 from thread import ThreadWithReturnValue
 import uuid
+# from core_manager import CoreManaerger
+# num_cores = multiprocessing.cpu_count()
+# # idel_cores = [i for i in range(num_cores)]
+# core_manager = CoreManaerger(
+#     available_cores=[str(i) for i in range(num_cores)])
 
 
 class BaseBatching(FunctionGroup):
+    """
+    CoreManager is not working in this strategy, we let Linux OS itself controls the mapping of docker container and CPU core
+
+    Args:
+        FunctionGroup: Each FunctionGroup represents a typical function
+
+    """
     log_file_flag = False
     log_file = None
 
@@ -28,7 +40,8 @@ class BaseBatching(FunctionGroup):
         self.historical_reqs = []
 
         if not BaseBatching.log_file_flag:
-            BaseBatching.log_file = open("./tmp/latency_amplification_baseline.csv", 'w')
+            BaseBatching.log_file = open(
+                "./tmp/latency_amplification_baseline.csv", 'w')
             print(f"function,duration(ms)",
                   file=BaseBatching.log_file, flush=True)
             BaseBatching.log_file_flag = False

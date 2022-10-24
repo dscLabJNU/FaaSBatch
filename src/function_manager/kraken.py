@@ -1,88 +1,157 @@
-from copy import copy
+import logging
 from function_group import FunctionGroup
-import gevent
 import numpy as np
 import time
-import copy
 from request_recorder import HistoryDelay
+from thread import ThreadWithReturnValue
+# from core_manager import CoreManaerger
+# num_cores = multiprocessing.cpu_count()
+# # idel_cores = [i for i in range(num_cores)]
+# core_manager = CoreManaerger(
+#     available_cores=[str(i) for i in range(num_cores)])
+
 
 class Kraken(FunctionGroup):
+    """
+    CoreManager is not working in this strategy, we let Linux OS itself controls the mapping of docker container and CPU core
+
+    Args:
+        FunctionGroup: Each FunctionGroup represents a typical function
+
+    """
+    log_file_flag = False
+    log_file = None
+
     def __init__(self, name, functions, docker_client, port_controller) -> None:
         super().__init__(name, functions, docker_client, port_controller)
-        self.batch_size = 4
+        self.resp_latency = 0  # in ms
+        self.containers = []
+        self.batch_size = 0  # in number of request
+        self.cold_start_time = 0  # in ms
+        self.slack = 0  # in ms
 
-    def send_request(self, function, request_id, runtime, input, output, to, keys):
-        res = super().send_request(function, request_id, runtime, input, output, to, keys)
+        self.history_duration = HistoryDelay(update_interval=np.inf)  # in ms
+        self.time_cold = HistoryDelay(update_interval=np.inf)
+        self.defer_times = HistoryDelay(update_interval=np.inf)
+        self.executing_rqs = []
+        self.historical_reqs = []
+
+        if not Kraken.log_file_flag:
+            Kraken.log_file = open(
+                "./tmp/latency_amplification_kraken.csv", 'w')
+            print(f"function,duration(ms)",
+                  file=Kraken.log_file, flush=True)
+            Kraken.log_file_flag = False
+
+    def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
+        res = super().send_request(function, request_id,
+                                   runtime, input, output, to, keys, duration)
         return res
 
-    def estimate_container(self) -> int:
-        """Estimates how many containers required
-
+    def estimate_container(self, local_rq) -> int:
+        """Estimates how many containers is required
         Returns:
-            list: current requests
+            int: number of containers needed
         """
-        
-        num_handle_rq = len(self.rq)
-        """
-        We get or create $num_containers for handler $num_handle_rq.
-        self.rq may update during this procedure, thus we leave the remaining requests to be handled in next round
-        """
-        num_containers = (num_handle_rq // self.batch_size) or num_handle_rq
-        return num_containers, num_handle_rq
+        return len(local_rq)
 
-    def dynamic_reactive_scaling(self, function):
+    def dynamic_reactive_scaling(self, function, local_rq):
         """Create containers according to the strategy
         """
-        num_containers, num_handle_rq = self.estimate_container()
-
-
+        num_containers = self.estimate_container(local_rq=local_rq)
         container_created = 0
+
+        # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
         candidate_containers = []
-        while container_created < num_containers:
+        print(f"We need {num_containers} of containers")
+
+        # 1. 先从container pool中获取尽量多可用的容器
+        while len(self.container_pool) and container_created < num_containers:
             container = self.self_container(function=function)
+            candidate_containers.append(container)
+            container_created += 1
+
+        # 2. 创建剩下所需的容器
+        while container_created < num_containers:
+            container = None
             while not container:
+                start = time.time()
                 container = self.create_container(function=function)
-            # the number of exec container hits limit
-            if container is None:
-                self.num_processing -= 1
-                print("container is None")
-                exit(1)
-                return
+                cold_start = (time.time() - start) * 1000  # Coverts s to ms
+                self.time_cold.append(cold_start)
 
             candidate_containers.append(container)
             container_created += 1
-        return candidate_containers, num_handle_rq
-        
-    def dispatch_request(self, container=None):
+            logging.info(
+                f"{container_created} of containers have been created")
+        return candidate_containers
+
+    def dispatch_request(self):
+        # Only process the request that req.processing == False
+        self.b.acquire()
+        local_rq = []
+        for req in self.rq:
+            if not req.processing:
+                req.processing = True
+                local_rq.append(req)
+        self.b.release()
         # no request to dispatch
-        if len(self.rq) - self.num_processing == 0:
+        if len(local_rq) == 0:
             return
-        if len(self.rq) == 0:
-            return 0
-        
-        self.num_processing += 1
-        function = self.rq[0].function
 
-        # Create containers according to Fifer strategy
-        candidate_containers, num_handle_rq = self.dynamic_reactive_scaling(function=function)
-        print(f"Having {len(candidate_containers)} containers for {num_handle_rq} of requests")
+        function = local_rq[0].function
+        # Create or get containers
+        candidate_containers = self.dynamic_reactive_scaling(
+            function=function, local_rq=local_rq)
 
+        # Map reqeusts to containers and run them
+        threads = self.map_and_run_rqs(local_rq, candidate_containers)
+
+        # Record exec time, remove running requests, and put container to pool
+        # Note that one thread may contains several request results
+        self.finish_threads(threads)
+
+    def map_and_run_rqs(self, local_rq, candidate_containers):
         idx = 0
         # Mapping requests to containers
-        while self.rq:
-            self.num_processing -= 1
-            print(
-                f"The length of rq in this {self.name} group is {len(self.rq)}")
-            if num_handle_rq == 0:
-                print("We handled enough number of requests")
-                return
-            num_handle_rq -= 1
-            req = self.rq.pop(0)
+        print(
+            f"Mapping {len(local_rq)} of requests to {len(candidate_containers)} of containers")
+        c_r_mapping = {c: [] for c in candidate_containers}
+        while local_rq:
             container = candidate_containers[idx]
-
-            res = container.send_request(req.data)
-            # res = {"res": 'ok'}
-            req.result.set(res)
+            req = local_rq.pop(0)
+            self.rq.remove(req)  # ???
+            c_r_mapping[container].append(req)
             idx = (idx + 1) % len(candidate_containers)
 
+        threads = []
+        for c, reqs in c_r_mapping.items():
+            t = ThreadWithReturnValue(
+                target=c.send_batch_requests, args=(reqs, self.executing_rqs,))
+            threads.append(t)
+            t.start()
+        return threads
+
+    def finish_threads(self, threads):
+        for t in threads:
+            print(f"Finising thread {t}")
+            result = t.join()
+
+            container = result['container']
+            requests = result['requests']
+            for req in requests:
+                self.executing_rqs.remove(req)
             self.put_container(container)
+
+            for req in requests:
+                self.record_info(req)
+
+    def record_info(self, req):
+        print(
+            f"request {req.function.info.function_name} is done, recording the execution infomation...")
+        self.historical_reqs.append(req)
+        self.history_duration.append(req.duration)
+        print(f"{req.function.info.function_name},{req.duration}",
+              file=Kraken.log_file, flush=True)
+        if req.defer:
+            self.defer_times.append(req.defer)
