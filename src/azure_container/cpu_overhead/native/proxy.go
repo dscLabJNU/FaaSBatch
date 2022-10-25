@@ -24,8 +24,8 @@ func invokeFunction(req map[string]interface{}, responses map[string]interface{}
 	functionId, _ := req["function_id"].(string)
 
 	var schedParams = []string{"python3", "fib.py"}
-	if _, ok := req["input_n"]; ok {
-		inputN := strconv.Itoa(int(req["input_n"].(float64)))
+	if entry, ok := req["azure_data"].(map[string]interface{}); ok {
+		inputN := strconv.Itoa(int(entry["input_n"].(float64)))
 		schedParams = append(schedParams, inputN)
 		// log.Printf("Runing python fip.py %s\n", inputN)
 	}

@@ -28,8 +28,8 @@ func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[
 
 	// var schedParams = []string{"schedtool", "-N", "-a", core, "-e", "python3", "fib.py"}
 	var schedParams = []string{"schedtool", "-F", "-p", "20", "-a", core, "-e", "python3", "fib.py"}
-	if _, ok := req["input_n"]; ok {
-		inputN := strconv.Itoa(int(req["input_n"].(float64)))
+	if entry, ok := req["azure_data"].(map[string]interface{}); ok {
+		inputN := strconv.Itoa(int(entry["input_n"].(float64)))
 		schedParams = append(schedParams, inputN)
 		log.Printf("Runing python fip.py [%s] with schedtool in core %s \n", inputN, core)
 	}
