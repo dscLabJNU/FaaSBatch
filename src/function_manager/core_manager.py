@@ -1,70 +1,96 @@
 from collections import defaultdict
-import time
 import logging
 
 
+class Core:
+    def __init__(self, str_id) -> None:
+        # 核上正在运行的任务数量
+        self.containers = []
+        # 该核被分配的次数
+        self.assign_times = 0
+        # 核 id
+        self.str_id = str_id
+
+    def __repr__(self):
+        return f"Core-{self.str_id}"
+
+
 class CoreManaerger:
-    def __init__(self, available_cores) -> None:
-        # Idel containers are not in this core-busy list
-        # busy_core -> [containers]
-        self.busy_cores = {
-            core: [] for core in available_cores
+    log_file = None
+
+    def __init__(self, core_ids) -> None:
+        self.busy_cores = []
+        for str_id in core_ids:
+            self.busy_cores.append(Core(str_id=str_id))
+        # Only for evaluation, doesn't matters
+        self.busy_cores_old = {
+            core: 0 for core in core_ids
         }
         # container -> [busy_cores]
         self.container_cores = defaultdict()
 
-    def shedule_cores(self, container, concurrency):
+    def snapshot_busy_cores(self):
+        """Record self.busy_core as slef.busy_core_old
+        """
+        for core in self.busy_cores:
+            self.busy_cores_old[core.str_id] = len(core.containers)
 
-        logging.info(f"Getting available cores in {concurrency} concurrency")
-        cores_to_assgin = self.get_idel_cores(concurrency=concurrency)
-        aval_core_str = ",".join(cores_to_assgin)
+    def show_cores_utils(self):
+        for core in self.busy_cores:
+            core_id = core.str_id
+            # if self.busy_cores_old[core.str_id] != len(core.containers):
+            print(
+                f"core {core_id}- load: {self.busy_cores_old[core.str_id]} => {len(core.containers)}, usage: {core.assign_times}")
 
-        logging.info(
-            f"Assigning core {cores_to_assgin} to container: {container.container.name}")
-        container.container.update(cpuset_cpus=aval_core_str)
+    def schedule_cores(self, container, concurrency):
+        cores_to_assign = self.get_idel_cores(concurrency=concurrency)
+        if len(cores_to_assign) != concurrency:
+            logging.warning(
+                f"We get {len(cores_to_assign)} of available cores, which is less than the concurrency requirement: {concurrency} ")
+
         self.assign_busy_cores(container=container,
-                               cores_to_assgin=cores_to_assgin)
+                               cores_to_assign=cores_to_assign)
+        aval_core_str = ",".join(
+            list(map(lambda x: x.str_id, cores_to_assign)))
+        container.container.update(cpuset_cpus=aval_core_str)
 
     # ============ OPTIONS to get idle cores ============
     def get_idel_cores(self, concurrency):
-        sorted_tuple = sorted(self.busy_cores.items(),
-                              key=lambda x: len(x[1]), reverse=False)
-
-        return [str(x[0]) for x in sorted_tuple[:concurrency]]
-
-    def get_idel_cores_by_start_time(self, concurrency):
-        def sum_start_times(containers):
-            return sum([c.container.start_time for c in containers])
-
-        sorted_tuple = sorted(self.busy_cores.items(),
-                              key=lambda x: sum_start_times(x[1]), reverse=False)
-        # print(sorted_tuple)
-        return [str(x[0]) for x in sorted_tuple[:concurrency]]
+        # First sort by len(core.containers), and sort by core.assign_times when we got equivalent len(core.containers)
+        sorted_tuple = sorted(
+            self.busy_cores, key=lambda core: (len(core.containers), core.assign_times), reverse=False)
+        return sorted_tuple[:concurrency]
     # ============ OPTIONS to get idle cores ============
+
+    def assign_busy_cores(self, container, cores_to_assign):
+        self.snapshot_busy_cores()
+        for core in cores_to_assign:
+            if container in core.containers:
+                raise ValueError(
+                    f"Duplicate container are going to be assigned on cores: {core}")
+            core.containers.append(container)
+            core.assign_times += 1
+        self.container_cores[container] = cores_to_assign
+        logging.info(
+            f"Busy cores {cores_to_assign} has been assigned to container {container.container.name} successfully!")
+        self.show_cores_utils()
 
     def get_assigned_cores(self, container):
         return self.container_cores[container]
-
-    def assign_busy_cores(self, container, cores_to_assgin):
-        for core in cores_to_assgin:
-            if container in self.busy_cores[core]:
-                raise ValueError(
-                    f"Duplicate container are going to be assigned on cores: {core}")
-            self.busy_cores[core].append(container)
-        self.container_cores[container] = cores_to_assgin
-        logging.info(
-            f"Busy cores {cores_to_assgin} has been assigned to container {container.container.name} successfully!")
 
     def release_busy_cores(self, container):
         assigned_cores = self.get_assigned_cores(container)
         logging.info(
             f"Releasing busy cores {assigned_cores} of container: {container.container.name}")
         for core in assigned_cores:
-            if container not in self.busy_cores[core]:
+            if container not in core.containers:
                 raise ValueError(f"There is no container using cores: {core}")
-            self.busy_cores[core].remove(container)
+            core.containers.remove(container)
 
+        # 'assigned_cores' will be cleared since 'get_assigned_cores' returns a reference
         self.container_cores[container].clear()
+        container.container.update(cpuset_cpus=None)
+
         if not assigned_cores:
             logging.info(
                 f"Busy cores of {container.container.name} has been released successfully!")
@@ -73,35 +99,33 @@ class CoreManaerger:
 
 
 if __name__ == "__main__":
-    from random import sample, randint, seed
+    from random import randint, seed, choice
+    logging.basicConfig(format='%(asctime)s: %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s',
+                        datefmt='%H:%M:%S', level='INFO')
 
     class Container:
-        def __init__(self, start_time) -> None:
-            # self.start_time = time.time()
-            self.start_time = start_time
+        def __init__(self, name) -> None:
             self.container = self
+            self.name = name
 
-
+        def update(self, cpuset_cpus):
+            logging.info(f"Update cpuset_cpus of to {cpuset_cpus}")
+    seed(54)
     containers = []
-    for i in range(1, 10):
-        containers.append(Container(start_time=i))
-    seed(1234)
-    busy_cores = {
-        "3": sample(containers, randint(1, len(containers))),
-        "5": sample(containers, randint(1, len(containers))),
-        "8": sample(containers, randint(1, len(containers))),
-        "2": sample(containers, randint(1, len(containers))),
-        "1": sample(containers, randint(1, len(containers))),
-        "7": sample(containers, randint(1, len(containers)))
-    }
-    for core, containers in busy_cores.items():
-        # print(f"Core {core} running {len(containers)} of containers")
-        print(f"Core: {core}, sum of start times {sum([c.start_time for c in containers])}")
-        # for i, container in enumerate(containers):
-        # print(f"\t- Container {i} started at {container.start_time}")
+    num_containers = 100
+    # Simulates $num_containers of containers
+    for i in range(1, num_containers+1):
+        containers.append(Container(name=f"container {i}"))
 
-    cm = CoreManaerger([])
-    cm.busy_cores = busy_cores
+    num_cores = 16
+    # Simulates 16 of cores, each id starts from 0
+    cm = CoreManaerger([str(i) for i in range(num_cores)])
 
-    concurrency = 1
-    print(cm.get_idel_cores_by_start_time(concurrency))
+    max_concurrency = 32
+    # Simulates cores assignment
+    for container in containers:
+        concurrency = randint(1, max_concurrency)
+        logging.info(f"Concurrency: {concurrency}")
+        cm.schedule_cores(container, concurrency=concurrency)
+        if choice([0, 1, 2]) == 0:
+            cm.release_busy_cores(container)
