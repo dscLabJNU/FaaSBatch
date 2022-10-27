@@ -67,10 +67,10 @@ class FunctionGroup():
 
     # put the request into request queue
 
-    def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
+    def send_request(self, function, request_id, runtime, input, output, to, keys, azure_data=None):
         function_id = function.info.function_name + "-" + str(uuid.uuid4())
         data = {'request_id': request_id, 'runtime': runtime,
-                'input': input, 'output': output, 'to': to, 'keys': keys, "duration": duration,
+                'input': input, 'output': output, 'to': to, 'keys': keys, "azure_data": azure_data,
                 "function_id": function_id}
         req = RequestInfo(function, request_id, data, function_id)
         self.rq.append(req)

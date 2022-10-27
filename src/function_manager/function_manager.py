@@ -15,7 +15,7 @@ sys.path.append('../../config')
 import config
 
 repack_clean_interval = 5.000 # repack and clean every 5 seconds
-dispatch_interval = 0.005 # 200 qps at most
+dispatch_interval = 0.5 # 200 qps at most
 
 # the class for scheduling functions' inter-operations
 class FunctionManager:
@@ -81,7 +81,7 @@ class FunctionManager:
             for function in self.functions.values():
                 gevent.spawn(function.dispatch_request)
     
-    def run(self, function_name, request_id, runtime, input, output, to, keys, duration=None):
+    def run(self, function_name, request_id, runtime, input, output, to, keys, azure_data=None):
         # print('run', function_name, request_id, runtime, input, output, to, keys)
         if function_name not in self.functions:
             print(f"There are functions {self.functions}")
@@ -89,7 +89,7 @@ class FunctionManager:
         
         group_name = extract_group_name(func_name=function_name)
         if config.REQUEST_BATCHING:
-            return self.function_groups[group_name].send_request(self.functions[function_name], request_id, runtime, input, output, to, keys, duration)
+            return self.function_groups[group_name].send_request(self.functions[function_name], request_id, runtime, input, output, to, keys, azure_data)
         else:
             return self.functions[function_name].send_request(request_id, runtime, input, output, to, keys)
 
