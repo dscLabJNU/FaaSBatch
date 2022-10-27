@@ -14,7 +14,7 @@ import config
 app = Flask(__name__)
 repo = Repository()
 
-def trigger_function(workflow_name, request_id, function_name, duration=None):
+def trigger_function(workflow_name, request_id, function_name, azure_data=None):
     info = repo.get_function_info(function_name, workflow_name + '_function_info')
     ip = ''
     if config.CONTROL_MODE == 'WorkerSP':
@@ -27,7 +27,7 @@ def trigger_function(workflow_name, request_id, function_name, duration=None):
         'workflow_name': workflow_name,
         'function_name': function_name,
         'no_parent_execution': True,
-        'duration': duration
+        "azure_data": azure_data
     }
     requests.post(url, json=data)
 
@@ -55,22 +55,25 @@ def run_workflow(workflow_name, request_id, duration=None):
     
     return end - start
 
-def run_function(workflow_name, function_name, request_id, duration):
+def run_function(workflow_name, request_id, azure_data):
     """Trigger a single function of a spefic workflow
 
     Args:
         workflow_name (str): Workflow name the function belongs to
-        function_name (str): The triggered function name
         request_id (str): random request id
-        duration (float): duration the function should be run
+        azure_data:
+            - function_name (str): The triggered function name
+            - duration (float): Duration the function should be run
+            - input_n (int): The N parameter specific for invoking fib.py function
     """
+    function_name = azure_data['function_name']
     repo.create_request_doc(request_id)
     belong_functions = repo.get_start_functions(workflow_name + '_workflow_metadata')
     print(f"running {workflow_name}, {function_name} in run_function")
 
     if function_name in belong_functions:
         start = time.time()
-        trigger_function(workflow_name, request_id, function_name, duration)
+        trigger_function(workflow_name, request_id, function_name, azure_data)
         latency = time.time() - start
     else:
         latency = 0
@@ -90,12 +93,9 @@ def run():
     logging.info('processing request ' + request_id + '...')
     repo.log_status(workflow, request_id, 'EXECUTE')
     
-    azure_bench = data.get('azure_bench', False)
-    if azure_bench:
-        duration = data['duration']
-        function_name = data['function_name']
-        print(f"Duration of {function_name} is {duration}")
-        latency = run_function(workflow, function_name, request_id, duration)
+    azure_data = data.get('azure_data', False)
+    if azure_data:
+        latency = run_function(workflow, request_id, azure_data)
     else:
         latency = run_workflow(workflow, request_id)
     repo.log_status(workflow, request_id, 'FINISH')

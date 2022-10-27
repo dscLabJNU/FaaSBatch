@@ -28,9 +28,7 @@ def run_workflow(workflow_name, request_id, azure_data=None):
     data = {'workflow':workflow_name, 'request_id': request_id}
     if azure_data:
         data.update({
-                "azure_bench": True,
-                "duration":azure_data['duration'], 
-                "function_name": azure_data['function_name']
+                "azure_data": azure_data
                 })
     try:
         rep = requests.post(url, json=data, timeout=TIMEOUT)
@@ -72,7 +70,7 @@ def analyze_workflow(workflow_name, mode):
         print(f'{workflow_name} e2e_latency: ', e2e_latency)
         e2e_dict[workflow_name] = e2e_latency
 
-def analyze(mode, azure_type=None):
+def analyze(mode, results_dir, azure_type=None):
     global e2e_dict
     workflow_pool = ['cycles', 'epigenomics', 'genome', 'soykb', 'video', 'illgal_recognizer', 'fileprocessing', 'wordcount']
     # workflow_pool = ['cycles', 'epigenomics', 'genome', 'soykb']
@@ -93,11 +91,14 @@ def analyze(mode, azure_type=None):
         print("Running Azure dataset...")
         for i, row in filter_df.iterrows():
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(func_map_dict, app_map_dict, row)
+            # if "azure_func_00000410" not in azure_data['function_name']:
+                # continue
             jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow, workflow_name=workflow_name, azure_data=azure_data))
+            # jobs.append(gevent.spawn(analyze_azure_workflow, workflow_name=workflow_name, azure_data=azure_data))
             workflow_pool.append(workflow_name)
             cnt += 1
-            # if cnt == 10:
-                # break
+            if cnt == 200:
+                break
 
         print(cnt)
         gevent.joinall(jobs)
@@ -114,8 +115,8 @@ def analyze(mode, azure_type=None):
     for workflow in workflow_pool:
         e2e_latencies.append(e2e_dict[workflow])
     df = pd.DataFrame({'workflow': workflow_pool, 'e2e_latency': e2e_latencies})
-    csv_name = f"{mode}_{azure_type if mode == 'azure_bench' else 'normal'}.csv"
-    df.to_csv(csv_name)
+    csv_name = f"{results_dir}/{mode}_{azure_type if mode == 'azure_bench' else 'normal'}.csv"
+    df.to_csv(csv_name, index=False)
 
 def prepare_invo_info(func_map_dict, app_map_dict, row):
     invo_ts = row['invo_ts']
@@ -126,7 +127,8 @@ def prepare_invo_info(func_map_dict, app_map_dict, row):
     # duration = 2.22551
     azure_data = {
                 "function_name": function_name,
-                "duration": duration
+                "duration": duration,
+                "input_n": 30
             }
     # print(f"duration of {function_name} is {duration}")
     print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
@@ -138,11 +140,13 @@ def parse_args():
                         "single", "corun", "azure_bench"], help="Select the benchmark suite")
         
     parser.add_argument("--azure_type", type=str, required='azure_bench' in sys.argv, choices=[
-                        "cpu_native", "io_native", "io_optimize"], help="Select the intensive type in which azure_bench mode")
+                        "cpu_native", "cpu_optimize", "io_native", "io_optimize"], help="Select the intensive type in which azure_bench mode")
     return parser.parse_args()
 
 if __name__ == '__main__':
+    results_dir = './results'
+    os.system(f"mkdir -p {results_dir}")
     args = parse_args()
     repo.clear_couchdb_results()
     repo.clear_couchdb_workflow_latency()
-    analyze(args.mode, args.azure_type)
+    analyze(args.mode, results_dir, args.azure_type)
