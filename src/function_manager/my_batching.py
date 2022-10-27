@@ -11,7 +11,7 @@ from core_manager import CoreManaerger
 num_cores = multiprocessing.cpu_count()
 # idel_cores = [i for i in range(num_cores)]
 core_manager = CoreManaerger(
-    available_cores=[str(i) for i in range(num_cores)])
+    core_ids=[str(i) for i in range(num_cores)])
 
 
 class Batching(FunctionGroup):
@@ -174,8 +174,7 @@ class Batching(FunctionGroup):
         while len(self.container_pool) and container_created < num_containers:
             container = self.self_container(function=function)
             # Update core-affinity list
-            # TODO 绑定CPU更慢？？
-            core_manager.shedule_cores(container, concurrency)
+            core_manager.schedule_cores(container, concurrency)
             candidate_containers.append(container)
             container_created += 1
 
@@ -209,7 +208,7 @@ class Batching(FunctionGroup):
                 # container = self.fake_create_container(function=function)
 
             # Update core-affinity list
-            core_manager.shedule_cores(container, concurrency)
+            core_manager.schedule_cores(container, concurrency)
             candidate_containers.append(container)
             container_created += 1
             logging.info(
