@@ -22,7 +22,6 @@ class BaseBatching(FunctionGroup):
         FunctionGroup: Each FunctionGroup represents a typical function
 
     """
-    log_file_flag = False
     log_file = None
 
     def __init__(self, name, functions, docker_client, port_controller) -> None:
@@ -39,12 +38,15 @@ class BaseBatching(FunctionGroup):
         self.executing_rqs = []
         self.historical_reqs = []
 
-        if not BaseBatching.log_file_flag:
+        if not BaseBatching.log_file:
             BaseBatching.log_file = open(
                 "./tmp/latency_amplification_baseline.csv", 'w')
+            BaseBatching.function_load_log = open(
+                "./tmp/function_load.csv", "w")
+            
             print(f"function,duration(ms)",
                   file=BaseBatching.log_file, flush=True)
-            BaseBatching.log_file_flag = False
+            print("function,load", file=BaseBatching.function_load_log, flush=True)
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         res = super().send_request(function, request_id,
@@ -105,6 +107,7 @@ class BaseBatching(FunctionGroup):
             return
 
         function = local_rq[0].function
+        print(f"{function.info.function_name},{len(local_rq)}", file=BaseBatching.function_load_log, flush=True)
         # Create or get containers
         candidate_containers = self.dynamic_reactive_scaling(
             function=function, local_rq=local_rq)
