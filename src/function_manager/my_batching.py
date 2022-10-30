@@ -4,7 +4,7 @@ from typing import List
 from function_group import FunctionGroup
 import numpy as np
 import time
-from request_recorder import HistoryDelay
+from history_record import HistoryRecord
 from thread import ThreadWithReturnValue
 import uuid
 from core_manager import CoreManaerger
@@ -25,9 +25,9 @@ class Batching(FunctionGroup):
         self.cold_start_time = 0  # in ms
         self.slack = 0  # in ms
 
-        self.history_duration = HistoryDelay(update_interval=np.inf)  # in ms
-        self.time_cold = HistoryDelay(update_interval=np.inf)
-        self.defer_times = HistoryDelay(update_interval=np.inf)
+        self.history_duration = HistoryRecord(update_interval=np.inf)  # in ms
+        self.time_cold = HistoryRecord(update_interval=np.inf)
+        self.defer_times = HistoryRecord(update_interval=np.inf)
         self.executing_rqs = []
         self.historical_reqs = []
 

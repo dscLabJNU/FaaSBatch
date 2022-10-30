@@ -2,7 +2,7 @@ import numpy as np
 import gevent
 
 
-class HistoryDelay():
+class HistoryRecord():
     """
     Data structure for request execute delay.
     Only stores the latency in last #self.update_interval seconds!!!
