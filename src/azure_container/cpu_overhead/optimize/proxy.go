@@ -19,6 +19,7 @@ type FibResult struct {
 	Duration  float64 `json:"duration"`
 	EndTime   float64 `json:"end_time"`
 	Result    int     `json:"result"`
+	CoreNum   string  `json:"core_num"`
 }
 
 func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[string]interface{}, core string) {
@@ -26,8 +27,8 @@ func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[
 	defer wg.Done()
 	functionId, _ := req["function_id"].(string)
 
-	// var schedParams = []string{"schedtool", "-N", "-a", core, "-e", "python3", "fib.py"}
-	var schedParams = []string{"schedtool", "-F", "-p", "20", "-a", core, "-e", "python3", "fib.py"}
+	var schedParams = []string{"schedtool", "-N", "-a", core, "-e", "python3", "fib.py"}
+	// var schedParams = []string{"schedtool", "-F", "-p", "20", "-a", core, "-e", "python3", "fib.py"}
 	if entry, ok := req["azure_data"].(map[string]interface{}); ok {
 		inputN := strconv.Itoa(int(entry["input_n"].(float64)))
 		schedParams = append(schedParams, inputN)
@@ -47,6 +48,7 @@ func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[
 	if err != nil {
 		log.Println("Failed because: ", err)
 	}
+	fibResult.CoreNum = core
 	responses[functionId] = fibResult
 }
 
