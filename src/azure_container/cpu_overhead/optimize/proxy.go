@@ -16,7 +16,7 @@ import (
 
 type FibResult struct {
 	StartTime float64 `json:"start_time"`
-	Duration  float64 `json:"duration"`
+	ExecTime  float64 `json:"exec_time"`
 	EndTime   float64 `json:"end_time"`
 	Result    int     `json:"result"`
 	CoreNum   string  `json:"core_num"`
