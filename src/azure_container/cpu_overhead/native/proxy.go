@@ -14,10 +14,10 @@ import (
 
 type FibResult struct {
 	StartTime float64 `json:"start_time"`
-	Duration  float64 `json:"duration"`
+	ExecTime  float64 `json:"exec_time"`
 	EndTime   float64 `json:"end_time"`
 	Result    int     `json:"result"`
-	WaitTime  int64   `json:"wait_time"`
+	QueueTime int64   `json:"queue_time"`
 }
 
 func invokeFunction(req map[string]interface{}, responses map[string]interface{}) string {
@@ -68,15 +68,15 @@ func batch_run(c *gin.Context) {
 	startTime := time.Now()
 	for _, req := range reqs {
 		functionId := invokeFunction(req, responses)
-		waitTime := time.Since(startTime)
+		queueTime := time.Since(startTime).Milliseconds()
 
 		if entry, ok := responses[functionId].(FibResult); ok {
 			// Modify the copy
-			entry.WaitTime = waitTime.Milliseconds()
+			entry.QueueTime = queueTime
 			// Reassign map entry
 			responses[functionId] = entry
 		}
-		log.Println("Funciton", functionId, "has been waited for", waitTime)
+		log.Println("Funciton", functionId, "has been waited for", queueTime, "ms")
 		log.Println("response:", responses[functionId])
 	}
 

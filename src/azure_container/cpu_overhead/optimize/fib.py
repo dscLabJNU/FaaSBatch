@@ -33,7 +33,7 @@ def main(args):
     result = fib(int(n))
     end = time.time()
     return {
-        "duration":end - start,
+            "exec_time":(end - start) * 1000, # Converts s to ms
             "start_time":start,
             "end_time":end,
             "result": result}
