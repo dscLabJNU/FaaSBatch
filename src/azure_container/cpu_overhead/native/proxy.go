@@ -67,8 +67,8 @@ func batch_run(c *gin.Context) {
 	responses := make(map[string]interface{})
 	startTime := time.Now()
 	for _, req := range reqs {
-		functionId := invokeFunction(req, responses)
 		queueTime := time.Since(startTime).Milliseconds()
+		functionId := invokeFunction(req, responses)
 
 		if entry, ok := responses[functionId].(FibResult); ok {
 			// Modify the copy
