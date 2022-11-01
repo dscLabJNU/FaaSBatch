@@ -69,7 +69,13 @@ class Kraken(FunctionGroup):
         if not Kraken.log_file:
             Kraken.log_file = open(
                 "./tmp/latency_amplification_kraken.csv", 'w')
-            print(f"function,duration(ms)",
+            """
+            schedule_time:  The time from receiving the request to sending the request to the container,
+                including cold start and time overhead of the strategy
+            queue_time:     Queue time of the request in the container
+            exec_time:      CPU time
+            """
+            print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms)",
                   file=Kraken.log_file, flush=True)
             # Note that we will only do this once when initializing the Class
             Kraken.function_load = read_function_load()
@@ -114,33 +120,29 @@ class Kraken(FunctionGroup):
     def dynamic_reactive_scaling(self, function, local_rq):
         """Create containers according to the strategy
         """
-        num_containers = self.estimate_container(
-            local_rq=local_rq, function=function)
-        container_created = 0
+        num_containers = self.estimate_container(local_rq=local_rq)
+        concurrency = len(local_rq)
+        container_retrieved = 0
 
         # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
         candidate_containers = []
-        print(f"We need {num_containers} of containers")
+        logging.info(f"We need {num_containers} of containers")
 
-        # 1. 先从container pool中获取尽量多可用的容器
-        while len(self.container_pool) and container_created < num_containers:
+        # 1. Obtain as many containers as possible from the container pool
+        while len(self.container_pool) and container_retrieved < num_containers:
             container = self.self_container(function=function)
             candidate_containers.append(container)
-            container_created += 1
+            container_retrieved += 1
+        logging.info(f"Get {container_retrieved} of containers from the pool")
 
-        # 2. 创建剩下所需的容器
-        while container_created < num_containers:
-            container = None
-            while not container:
-                start = time.time()
-                container = self.create_container(function=function)
-                cold_start = (time.time() - start) * 1000  # Coverts s to ms
-                self.time_cold.append(cold_start)
+        # 2. Create remaining containers
+        new_containers = self.create_containers_in_blocking(
+            num_containers=num_containers - container_retrieved, function=function)
 
-            candidate_containers.append(container)
-            container_created += 1
-            logging.info(
-                f"{container_created} of containers have been created")
+        candidate_containers.extend(new_containers)
+        if len(candidate_containers) != num_containers:
+            raise ValueError(
+                f"We want {num_containers} of containers, but there are {len(candidate_containers)}")
         return candidate_containers
 
     def reactive_scaling(self, candidate_containers):
@@ -221,7 +223,11 @@ class Kraken(FunctionGroup):
             f"request {req.function.info.function_name} is done, recording the execution infomation...")
         self.historical_reqs.append(req)
         self.history_duration.append(req.duration)
-        print(f"{req.function.info.function_name},{req.duration}",
+        result = req.result.get()
+        print(f"Result is: {result}")
+        exec_time = result['exec_time']
+        queue_time = result.get('queue_time', 0)
+        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time}",
               file=Kraken.log_file, flush=True)
         if req.defer:
             self.defer_times.append(req.defer)

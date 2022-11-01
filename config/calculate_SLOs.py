@@ -11,4 +11,5 @@ df_baseline = pd.read_csv(baseline_csv)
 groupby_func = df_baseline.groupby("function")
 func_SLOs = {}
 for func, info in groupby_func:
-    func_SLOs[func] = info['duration(ms)'].quantile(0.98)
+    # schedule_time includs cold start, and time overhead of the strategy
+    func_SLOs[func] = (info['exec_time(ms)'] + info['schedule_time(ms)']).quantile(0.98)

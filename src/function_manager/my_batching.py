@@ -35,7 +35,15 @@ class Batching(FunctionGroup):
             global log_file
             log_file = open(
                 "./tmp/latency_amplification_my_batching.csv", 'w')
-            print(f"function,duration(ms)", file=log_file, flush=True)
+
+            """
+            schedule_time:  The time from receiving the request to sending the request to the container,
+                including cold start and time overhead of the strategy
+            queue_time:     Queue time of the request in the container
+            exec_time:      CPU time
+            """
+            print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms)",
+                  file=log_file, flush=True)
             Batching.log_file_flag = True
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
@@ -69,7 +77,7 @@ class Batching(FunctionGroup):
     def adjust_by_defer(self):
 
         for history_req in self.historical_reqs:
-            diff = history_req.expect_end_ts - history_req.end_ts
+            diff = history_req.expect_end_ts - history_req.end_exec
             print(f"diff = {history_req.expect_end_ts} - {history_req.end_ts}")
             predict_early = True if diff < 0 else False
 
@@ -107,10 +115,10 @@ class Batching(FunctionGroup):
         avg_duration = self.history_duration.get_mean()
         exp_end_times = []
         for req in self.executing_rqs:
-            if not req.start_ts:
-                print("req.start_ts == 0 shoud be never happend...")
+            if not req.start_exec:
+                print("req.start_exec == 0 shoud be never happend...")
                 exit(1)
-            req.expect_end_ts = req.start_ts + avg_duration
+            req.expect_end_ts = req.start_exec + avg_duration
             exp_end_times.append(req.expect_end_ts)
         # Adjust defer factor by analyzing the diff between historical exp_end_time and end_ts
         # exp_end_times = self.adjust_by_defer()
@@ -281,7 +289,12 @@ class Batching(FunctionGroup):
             f"request {req.function.info.function_name} is done, recording the execution infomation...")
         self.historical_reqs.append(req)
         self.history_duration.append(req.duration)
-        print(f"{req.function.info.function_name},{req.duration}",
+        result = req.result.get()
+        print(f"Result is: {result}")
+        exec_time = result['exec_time']
+        # No queuing in our proposed method, all requests are invoked in parallel
+        queue_time = result.get('queue_time', 0)
+        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time}",
               file=log_file, flush=True)
         if req.defer:
             self.defer_times.append(req.defer)

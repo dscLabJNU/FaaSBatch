@@ -28,27 +28,27 @@ class HistoryRecord():
         return self.get_mean()
 
     def get_mean(self):
-        if len(self.values) == 0:
-            return 0
-        return self.values.mean()
+        return 0 if self.is_empty() else self.values.mean()
 
     def get_std(self):
-        if len(self.values) <= 1:
-            return np.inf
-        return self.values.std()
+        return 0 if self.is_empty() else self.values.std()
 
     def get_max(self):
-        if len(self.values) == 0:
-            return 0
-        return self.values.max()
+        return 0 if self.is_empty() else self.values.max()
 
     def get_last(self):
-        if len(self.values) == 0:
-            return 0
-        return self.values[-1]
+        return 0 if self.is_empty() else self.values[-1]
 
     def append(self, value):
         self.values = np.append(self.values, value)
 
     def is_empty(self):
-        return len(self.values) == 0
+        return self.size() == 0
+
+    def get_gradient(self):
+        if self.size() <= 1:
+            return 0
+        return np.gradient(self.values)
+
+    def size(self):
+        return len(self.values)
