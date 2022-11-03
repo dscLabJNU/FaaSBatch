@@ -5,6 +5,7 @@ from function_info import parse
 from function_group import FunctionGroup
 from my_batching import Batching
 from kraken import Kraken
+from sfs import SFS
 from baseline_batching import BaseBatching
 from port_controller import PortController
 from function import Function

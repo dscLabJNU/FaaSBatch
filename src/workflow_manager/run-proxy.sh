@@ -2,6 +2,12 @@ function usage() {
     echo -e "Usage: $0 [host-ip]"
 }
 
+function kill_SFS(){
+    echo "Killing sfs-scheduler..."
+    kill_cmd=$(ps -ef | grep -E "./sfs-scheduler" | grep -v grep | awk '{print $2}')
+    kill $kill_cmd
+}
+
 function check_ip(){
     IP_ADDR=$1
 
@@ -26,6 +32,15 @@ function check_ip(){
 if [[ $# -lt 1 ]]; then
     usage
 else
-    check_ip $1
-python3 proxy.py $1 8000
+    ip=$1
+    check_ip $ip
+if [[ ${strategy} == "SFS" ]]; then
+    kill_SFS
+    echo "launching SFS scheduler..."
+    source ../../config/constants.config
+    cd $SFSPath
+    nohup bash run.sh &> SFS.out&
+    cd -
+fi
+python3 proxy.py $ip 8000
 fi
