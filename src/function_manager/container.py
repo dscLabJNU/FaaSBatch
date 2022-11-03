@@ -13,7 +13,7 @@ class Container:
     @classmethod
     def create(cls, client, image_name, port, attr, bind_cpus=None):
         run_params = {"detach": True, "ports": {
-            '5000/tcp': str(port)}, "labels": ['workflow'], "privileged": True}
+            '5000/tcp': str(port)}, "labels": ['workflow'], "privileged": True, "pid_mode": "host"}
         if bind_cpus:
             # Maps a list [0,1,3] to a str '0,1,3'
             bind_cpus_str = ','.join(list(map(lambda x: str(x), bind_cpus)))

@@ -1,5 +1,8 @@
 from collections import defaultdict
 import logging
+import psutil
+import gevent
+import numpy as np
 
 
 class Core:
@@ -10,6 +13,8 @@ class Core:
         self.assign_times = 0
         # 核 id
         self.str_id = str_id
+        # utilizations, Only stores specific number
+        self.utilizations = []
 
     def __repr__(self):
         return f"Core-{self.str_id}"
@@ -29,21 +34,51 @@ class CoreManaerger:
         # container -> [busy_cores]
         self.container_cores = defaultdict()
 
+        # Only store the utilization for a specific number of states
+        self.num_states = 3
+
+        self.collect_interval = 0.2  # in second
+        # Collect core utilization every $(collect_interval) second
+        gevent.spawn_later(self.collect_interval, self.collect_utilization)
+
+    def collect_utilization(self):
+        gevent.spawn_later(self.collect_interval, self.collect_utilization)
+        core_utilization = psutil.cpu_percent(percpu=True)
+        for core in self.busy_cores:
+            int_id = int(core.str_id)
+            core.utilizations.append(core_utilization[int_id])
+            # Only stores specific number of the utilizations, since the previous states bring no benifit for evaluation the future load of a core
+            diff = len(core.utilizations) - self.num_states
+            while diff > 0:
+                core.utilizations.pop(0)
+                diff -= 1
+            # print(f"utilization of {core.str_id} : {core.utilizations}")
+
     def snapshot_busy_cores(self):
         """Record self.busy_core as slef.busy_core_old
+        Only for evaluation !!!
         """
         for core in self.busy_cores:
             self.busy_cores_old[core.str_id] = len(core.containers)
 
     def show_cores_utils(self):
+        """Only for evaluation !!!
+        """
         for core in self.busy_cores:
             core_id = core.str_id
             # if self.busy_cores_old[core.str_id] != len(core.containers):
             print(
                 f"core {core_id}- load: {self.busy_cores_old[core.str_id]} => {len(core.containers)}, usage: {core.assign_times}")
 
+    def schedule_cores_balance(self, container, concurrency):
+        cores_to_assign = self.get_idel_cores_by_balance(concurrency=concurrency)
+        self.process(container, concurrency, cores_to_assign)
+
     def schedule_cores(self, container, concurrency):
-        cores_to_assign = self.get_idel_cores(concurrency=concurrency)
+        cores_to_assign = self.get_idel_cores_by_utils(concurrency=concurrency)
+        self.process(container, concurrency, cores_to_assign)
+
+    def process(self, container, concurrency, cores_to_assign):
         if len(cores_to_assign) != concurrency:
             logging.warning(
                 f"We get {len(cores_to_assign)} of available cores, which is less than the concurrency requirement: {concurrency} ")
@@ -55,10 +90,24 @@ class CoreManaerger:
         container.container.update(cpuset_cpus=aval_core_str)
 
     # ============ OPTIONS to get idle cores ============
-    def get_idel_cores(self, concurrency):
-        # First sort by len(core.containers), and sort by core.assign_times when we got equivalent len(core.containers)
+    def get_idel_cores_by_balance(self, concurrency):
+        """Measuring the load of each CPU core by a second-level sort
+        1. First sort by len(core.containers), 
+        2. and then sort by core.assign_times when we got equivalent len(core.containers)
+        """
         sorted_tuple = sorted(
             self.busy_cores, key=lambda core: (len(core.containers), core.assign_times), reverse=False)
+        return sorted_tuple[:concurrency]
+
+    def get_idel_cores_by_utils(self, concurrency):
+        """Measuring the load of each CPU cores by thier transient (or historical) utilization
+        1. First sort by current utilization
+        2. and then sort by sum(np.diff(np.array(utilization))) in ascending order when we got equivalent current utilization
+        """
+        sorted_tuple = sorted(
+            self.busy_cores, key=lambda core: (
+                core.utilizations[-1], sum(np.diff(np.array(core.utilizations))))
+        )
         return sorted_tuple[:concurrency]
     # ============ OPTIONS to get idle cores ============
 

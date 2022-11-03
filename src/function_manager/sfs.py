@@ -1,15 +1,8 @@
 import logging
 from function_group import FunctionGroup
 import numpy as np
-import time
 from history_record import HistoryRecord
 from thread import ThreadWithReturnValue
-import sys
-import os
-import pandas as pd
-import math
-sys.path.append('../../config')
-import config
 # from core_manager import CoreManaerger
 # num_cores = multiprocessing.cpu_count()
 # # idel_cores = [i for i in range(num_cores)]
@@ -17,22 +10,7 @@ import config
 #     available_cores=[str(i) for i in range(num_cores)])
 
 
-def read_function_load():
-    batching_path = config.PROJECT_PATH
-    csv = f"{batching_path}/src/workflow_manager/tmp/function_load.csv"
-    if not os.path.exists(csv):
-        raise ValueError(
-            "Cannot find function_load.csv. Please executes baseline strategy according to the README.md")
-
-    df_baseline = pd.read_csv(csv)
-    groupby_func = df_baseline.groupby("function")
-    function_load = {}
-    for func, info in groupby_func:
-        function_load[func] = list(info['load'])
-    return function_load
-
-
-class Kraken(FunctionGroup):
+class SFS(FunctionGroup):
     """
     CoreManager is not working in this strategy, we let Linux OS itself controls the mapping of docker container and CPU core
 
@@ -41,12 +19,14 @@ class Kraken(FunctionGroup):
 
     """
     log_file = None
-    function_load = {}
 
     def __init__(self, name, functions, docker_client, port_controller) -> None:
         super().__init__(name, functions, docker_client, port_controller)
         self.resp_latency = 0  # in ms
         self.containers = []
+        self.batch_size = 0  # in number of request
+        self.cold_start_time = 0  # in ms
+        self.slack = 0  # in ms
 
         self.history_duration = HistoryRecord(update_interval=np.inf)  # in ms
         self.time_cold = HistoryRecord(update_interval=np.inf)
@@ -54,21 +34,9 @@ class Kraken(FunctionGroup):
         self.executing_rqs = []
         self.historical_reqs = []
 
-        """
-        Parameter "stage_SLO" in below is used to batching requests
-            We evaluate the SLO for each function by using the 98-percentail latency generated in baseline stragety,
-        where the baseline strategy spawns a single container to serve each incoming request        
-        """
-        self.stage_SLO = {}
-        for function in functions:
-            function_name = function.info.function_name
-            # It is possible that not all functions have been run in the baseline policy
-            if function_name in config.FUNCTION_SLOS.keys():
-                self.stage_SLO[function_name] = config.FUNCTION_SLOS[function_name]
-
-        if not Kraken.log_file:
-            Kraken.log_file = open(
-                "./tmp/latency_amplification_kraken.csv", 'w')
+        if not SFS.log_file:
+            SFS.log_file = open(
+                "./tmp/latency_amplification_SFS.csv", 'w')
             """
             schedule_time:  The time from receiving the request to sending the request to the container,
                 including cold start and time overhead of the strategy
@@ -76,56 +44,24 @@ class Kraken(FunctionGroup):
             exec_time:      CPU time
             """
             print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms)",
-                  file=Kraken.log_file, flush=True)
-            # Note that we will only do this once when initializing the Class
-            Kraken.function_load = read_function_load()
+                  file=SFS.log_file, flush=True)
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         res = super().send_request(function, request_id,
                                    runtime, input, output, to, keys, duration)
         return res
 
-    def predict_load(self, function_name, current_load):
-        # We idealize that the Kraken prediction hit rate is 100%,
-        # so we directly read the function load recorded in the baseline policy
-        try:
-            next_load = Kraken.function_load[function_name].pop(0)
-        except:
-            logging.warning(f"Kraken.function_load[function_name]: {Kraken.function_load[function_name]}")
-            raise IndexError(f"Poping function load of {function_name} failed")
-        return next_load
-
-    def estimate_container(self, local_rq, function) -> int:
+    def estimate_container(self, local_rq) -> int:
         """Estimates how many containers is required
         Returns:
             int: number of containers needed
         """
-        avg_duration = self.history_duration.get_mean()
-        if not avg_duration:
-            logging.info(f"Not avg. duration yet")
-            return len(local_rq)
-
-        function_name = function.info.function_name
-        batch_size = math.floor(self.stage_SLO[function_name] / avg_duration)
-
-        current_load = len(local_rq)
-        # Is it reasonable to use time series to predict such widely varying functional loads???
-        predict_load = self.predict_load(function_name, current_load)
-
-        # batches = 0 if predict_load is zero, because some functions may have only one invocation
-        batches = math.ceil(predict_load / batch_size) or 1
-
-        logging.info(
-            f"avg. duration is {avg_duration}, now set the batch size as {batches}")
-        logging.info(
-            f"Number of containers estimated by Kraken is: {batches}")
-
-        return batches
+        return len(local_rq)
 
     def dynamic_reactive_scaling(self, function, local_rq):
         """Create containers according to the strategy
         """
-        num_containers = self.estimate_container(local_rq=local_rq, function=function)
+        num_containers = self.estimate_container(local_rq=local_rq)
         concurrency = len(local_rq)
         container_retrieved = 0
 
@@ -150,13 +86,6 @@ class Kraken(FunctionGroup):
                 f"We want {num_containers} of containers, but there are {len(candidate_containers)}")
         return candidate_containers
 
-    def reactive_scaling(self, candidate_containers):
-        """scale containers up or down in response to request overloading at 
-        containers under-provisioning and container over-provisioning, respectively.
-        """
-        # We do nothing since we idealize that the Kraken prediction hit rate is 100%,
-        return candidate_containers
-
     def dispatch_request(self):
         # Only process the request that req.processing == False
         self.b.acquire()
@@ -164,6 +93,8 @@ class Kraken(FunctionGroup):
         for req in self.rq:
             if not req.processing:
                 req.processing = True
+                req.data['azure_data'].update({"activate_SFS": True})
+                print(f"req {req.data['azure_data']}")
                 local_rq.append(req)
         self.b.release()
         # no request to dispatch
@@ -171,15 +102,9 @@ class Kraken(FunctionGroup):
             return
 
         function = local_rq[0].function
-        if "cpu_optimize" in function.info.function_name:
-            raise ValueError(
-                "Wrong function type (cpu_optimize) for Kraken strategy")
         # Create or get containers
         candidate_containers = self.dynamic_reactive_scaling(
             function=function, local_rq=local_rq)
-
-        # Reactive Scaling
-        candidate_containers = self.reactive_scaling(candidate_containers)
 
         # Map reqeusts to containers and run them
         threads = self.map_and_run_rqs(local_rq, candidate_containers)
@@ -229,10 +154,10 @@ class Kraken(FunctionGroup):
         self.historical_reqs.append(req)
         self.history_duration.append(req.duration)
         result = req.result.get()
-        print(f"Result is: {result}")
         exec_time = result['exec_time']
+        print(f"exec_time vs. duration: {exec_time}:{req.duration}")
         queue_time = result.get('queue_time', 0)
         print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time}",
-              file=Kraken.log_file, flush=True)
+              file=SFS.log_file, flush=True)
         if req.defer:
             self.defer_times.append(req.defer)
