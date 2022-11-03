@@ -36,7 +36,15 @@ def parse_args():
 def invoke_requests(container_pool, concurrency, log_file=None):
     threads = []
     reqs = [
-        {"duration": 0.01, "function_id": str(id), "concurrency": concurrency,"inpur_n": 31} for id in range(1, concurrency+1)
+        {
+            "azure_data": {
+                'function_name': f'azure_func_{id}',
+                'input_n': 34,
+                'activate_SFS': True # Only for evaluating cpu-native
+            },
+            "function_id": str(id),
+            "concurrency": concurrency
+        } for id in range(1, concurrency+1)
     ]
     for c in container_pool:
         t = ThreadWithReturnValue(
@@ -48,7 +56,9 @@ def invoke_requests(container_pool, concurrency, log_file=None):
         res = t.join()
     invocatino_latency = time.time() - start
     if log_file:
-        print(f"{invocatino_latency*1000},{concurrency}", file=log_file, flush=True)
+        print(f"{invocatino_latency*1000},{concurrency}",
+              file=log_file, flush=True)
+
 
 if "__main__" == __name__:
     num_cores = multiprocessing.cpu_count()
@@ -69,6 +79,7 @@ if "__main__" == __name__:
             # The performance gets worse if we dont map a specific vcpu
             # we turn it off or on in container.py#Container@create
             container_pool = create_containers(
-                image_name=image_name, num_containers=1, num_cores=concur)
-            invoke_requests(container_pool, concurrency=concur, log_file=log_file)
+                image_name=image_name, num_containers=concur, num_cores=num_cores)
+            invoke_requests(container_pool, concurrency=1,
+                            log_file=log_file)
             print(f"Currency: {concur}")
