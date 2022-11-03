@@ -1,12 +1,8 @@
 import logging
-import multiprocessing
-from typing import List
 from function_group import FunctionGroup
 import numpy as np
-import time
-from request_recorder import HistoryDelay
+from history_record import HistoryRecord
 from thread import ThreadWithReturnValue
-import uuid
 # from core_manager import CoreManaerger
 # num_cores = multiprocessing.cpu_count()
 # # idel_cores = [i for i in range(num_cores)]
@@ -32,9 +28,9 @@ class BaseBatching(FunctionGroup):
         self.cold_start_time = 0  # in ms
         self.slack = 0  # in ms
 
-        self.history_duration = HistoryDelay(update_interval=np.inf)  # in ms
-        self.time_cold = HistoryDelay(update_interval=np.inf)
-        self.defer_times = HistoryDelay(update_interval=np.inf)
+        self.history_duration = HistoryRecord(update_interval=np.inf)  # in ms
+        self.time_cold = HistoryRecord(update_interval=np.inf)
+        self.defer_times = HistoryRecord(update_interval=np.inf)
         self.executing_rqs = []
         self.historical_reqs = []
 
@@ -43,8 +39,13 @@ class BaseBatching(FunctionGroup):
                 "./tmp/latency_amplification_baseline.csv", 'w')
             BaseBatching.function_load_log = open(
                 "./tmp/function_load.csv", "w")
-            
-            print(f"function,duration(ms)",
+            """
+            schedule_time:  The time from receiving the request to sending the request to the container,
+                including cold start and time overhead of the strategy
+            queue_time:     Queue time of the request in the container
+            exec_time:      CPU time
+            """
+            print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms)",
                   file=BaseBatching.log_file, flush=True)
             print("function,load", file=BaseBatching.function_load_log, flush=True)
 
@@ -65,32 +66,27 @@ class BaseBatching(FunctionGroup):
         """
         num_containers = self.estimate_container(local_rq=local_rq)
         concurrency = len(local_rq)
-        container_created = 0
+        container_retrieved = 0
 
         # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
         candidate_containers = []
-        print(f"We need {num_containers} of containers")
+        logging.info(f"We need {num_containers} of containers")
 
-        # 1. 先从container pool中获取尽量多可用的容器
-        while len(self.container_pool) and container_created < num_containers:
+        # 1. Obtain as many containers as possible from the container pool
+        while len(self.container_pool) and container_retrieved < num_containers:
             container = self.self_container(function=function)
             candidate_containers.append(container)
-            container_created += 1
+            container_retrieved += 1
+        logging.info(f"Get {container_retrieved} of containers from the pool")
 
-        # 2. 创建剩下所需的容器
-        while container_created < num_containers:
-            container = None
-            while not container:
-                start = time.time()
-                container = self.create_container(function=function)
-                cold_start = (time.time() - start) * 1000  # Coverts s to ms
-                self.time_cold.append(cold_start)
-                # container = self.fake_create_container(function=function)
+        # 2. Create remaining containers
+        new_containers = self.create_containers_in_blocking(
+            num_containers=num_containers - container_retrieved, function=function)
 
-            candidate_containers.append(container)
-            container_created += 1
-            logging.info(
-                f"{container_created} of containers have been created")
+        candidate_containers.extend(new_containers)
+        if len(candidate_containers) != num_containers:
+            raise ValueError(
+                f"We want {num_containers} of containers, but there are {len(candidate_containers)}")
         return candidate_containers
 
     def dispatch_request(self):
@@ -107,7 +103,8 @@ class BaseBatching(FunctionGroup):
             return
 
         function = local_rq[0].function
-        print(f"{function.info.function_name},{len(local_rq)}", file=BaseBatching.function_load_log, flush=True)
+        print(f"{function.info.function_name},{len(local_rq)}",
+              file=BaseBatching.function_load_log, flush=True)
         # Create or get containers
         candidate_containers = self.dynamic_reactive_scaling(
             function=function, local_rq=local_rq)
@@ -159,7 +156,11 @@ class BaseBatching(FunctionGroup):
             f"request {req.function.info.function_name} is done, recording the execution infomation...")
         self.historical_reqs.append(req)
         self.history_duration.append(req.duration)
-        print(f"{req.function.info.function_name},{req.duration}",
+        result = req.result.get()
+        exec_time = result['exec_time']
+        print(f"exec_time vs. duration: {exec_time}:{req.duration}")
+        queue_time = result.get('queue_time', 0)
+        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time}",
               file=BaseBatching.log_file, flush=True)
         if req.defer:
             self.defer_times.append(req.defer)

@@ -1,15 +1,11 @@
 import logging
-import queue
 import time
-import math
 import uuid
-from deprecated import deprecated
+import threading
+
 from gevent import event
 from gevent.lock import BoundedSemaphore
 from container import Container
-from function_info import FunctionInfo
-from function import Function
-import numpy as np
 
 """
 Data structure for request info
@@ -22,18 +18,20 @@ class RequestInfo:
         self.request_id = request_id
         self.data = data
         self.result = event.AsyncResult()
-        self.arrival = time.time()
         # True if request is being process
         self.processing = False
         self.function_id = function_id
-        self.start_ts = 0  # Timestamp as the execution started
-        self.end_ts = 0  # Timestamp as the exeuction end
+
+        self.arrival = time.time()
+        self.start_exec = 0  # Timestamp as the execution started
+        self.end_exec = 0  # Timestamp as the exeuction end
         self.expect_end_ts = 0  # Expected finish timestamp
+
         self.defer = None  # Defer the expect_end_ts close to the end_ts
 
-    def get_waiting_time(self):
-        if self.start_ts > 0:
-            return self.start_ts - self.arrival
+    def get_schedule_time(self):
+        if self.start_exec > 0:
+            return (self.start_exec - self.arrival) * 1000  # Converts s to ms
         else:
             raise ValueError("This request has not been executed")
 
@@ -74,9 +72,6 @@ class FunctionGroup():
                 "function_id": function_id}
         req = RequestInfo(function, request_id, data, function_id)
         self.rq.append(req)
-
-        # res = function.send_request(request_id, runtime, input, output, to, keys)
-
         res = req.result.get()
         return res
 
@@ -141,8 +136,68 @@ class FunctionGroup():
         self.b.release()
         return res
 
-    # create a new container
+    def create_containers_in_blocking(self, num_containers, function):
+        """Creating containers in a blocking way, i.e., one by one
+        Containers creation can be in blocking way or parallel way, 
+        experimental result shows that a blocking way gets better performance
+        """
+        if num_containers <= 0:
+            return []
+        containers = []
+        container_created = 0
+        while container_created < num_containers:
+            container = None
+            while not container:
+                start = time.time()
+                container = self.create_container(function=function)
+                cold_start = (time.time() - start) * 1000  # Coverts s to ms
+                self.time_cold.append(cold_start)
+
+            containers.append(container)
+            container_created += 1
+            logging.info(
+                f"{container_created} of containers have been created")
+        return containers
+
+    def create_containers_in_parallel(self, num_containers, function):
+        """Creating containers in a parallel fashion, using multi-threadings
+        """
+        if num_containers <= 0:
+            return []
+        containers = []
+        logging.info(
+            f"Ready for creating {num_containers} of containers in parallel")
+        containers = self.parallel_create_containers(
+            num_containers=num_containers, function=function, containers_parallel=containers)
+        if num_containers != len(containers):
+            raise ValueError(
+                "Number of container needed and that of created NOT equal!!!")
+        logging.info(
+            f"Created {len(containers)} of containers in parallel")
+        return containers
+
+    def create_container_in_thread(self, function, containers_parallel):
+        container = None
+        while not container:
+            container = self.create_container(function=function)
+
+        containers_parallel.append(container)
+
+    def parallel_create_containers(self, num_containers, function, containers_parallel):
+        threads = []
+        for _ in range(num_containers):
+            t = threading.Thread(
+                target=self.create_container_in_thread, args=(function, containers_parallel,))
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+        return containers_parallel
+
     def create_container(self, function, bind_cpus=None):
+        """Creating a new container
+        """
         # do not create new exec container
         # when the number of execs hits the limit
         """ 暂时忽略scale limit

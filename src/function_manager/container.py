@@ -67,13 +67,9 @@ class Container:
             f"Batching {len(reqs)} of requests to container {self.container.name}")
         for req in reqs:
             executing_rqs.append(req)
-            req.start_ts = time.time()
+            req.start_exec = time.time()
             print(f"executing req: {req.function_id}")
-        #     res = self.send_request(data=req.data)
-        #     req.end_ts = time.time()
-        #     req.result.set(res)
-        #     req.duration = (req.end_ts - req.start_ts) * 1000
-        
+
         d_list = list(map(lambda x: x.data, reqs))
         print(f"data list is: {d_list}")
         r = requests.post(base_url.format(self.port, 'batch_run'), json=d_list)
@@ -88,8 +84,8 @@ class Container:
             function_id = req.function_id
             res = r.json()[function_id]
             req.result.set(res)
-            req.end_ts = time.time()
-            req.duration = (req.end_ts - req.start_ts) * 1000
+            req.end_exec = time.time()
+            req.duration = (req.end_exec - req.start_exec) * 1000
             print(f"Result of request: {function_id} is {res}")
         self.lasttime = time.time()
         return {"container": self, "requests": reqs}

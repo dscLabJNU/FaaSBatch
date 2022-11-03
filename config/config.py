@@ -1,6 +1,6 @@
 import os
 import customize_azure
-import calculate_SLOs
+
 PROJECT_PATH = "/home/vagrant/batching-request"
 COUCHDB_URL = 'http://openwhisk:openwhisk@10.0.0.103:5984/'
 REDIS_HOST = '127.0.0.1' # it serves to connect with the local redis, so it should be 127.0.0.1
@@ -43,4 +43,6 @@ AZURE_DATA_DIR='/home/vagrant/data/Azure'
 """We first evaluates benchmark functions in baseline stragety (spawn a single container to serve each incoming request)
 and then calculates the 98th latency as the corresponding SLO
 """
-FUNCTION_SLOS = calculate_SLOs.func_SLOs
+if os.environ.get("strategy") == "Kraken":
+    import calculate_SLOs
+    FUNCTION_SLOS = calculate_SLOs.func_SLOs
