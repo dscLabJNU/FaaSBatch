@@ -1,3 +1,4 @@
+from random import seed
 from gevent import monkey
 monkey.patch_all()
 import uuid
@@ -81,6 +82,7 @@ def analyze(mode, results_dir, azure_type=None):
     # workflow_pool = ['genome', 'genome', 'genome', 'genome', 'genome']
 
     if mode == 'azure_bench':
+        seed(5432)
         workflow_pool.clear()
         workflow_infos = yaml.load(open(
             f"{customize_azure.AZURE_BENCH_ADDR}/workflow_infos.yaml"), Loader=yaml.FullLoader)
@@ -89,7 +91,9 @@ def analyze(mode, results_dir, azure_type=None):
 
         df = azure.df
         func_map_dict, app_map_dict = azure.load_mappers()
-        filter_df = azure.filter_df(app_map_dict)
+
+        num_invos = 99999999
+        filter_df = azure.filter_df(app_map_dict, num_invos)
 
         cnt = 0
         jobs = []
@@ -104,7 +108,7 @@ def analyze(mode, results_dir, azure_type=None):
             # jobs.append(gevent.spawn(analyze_azure_workflow, workflow_name=workflow_name, azure_data=azure_data))
             workflow_pool.append(workflow_name)
             cnt += 1
-            if cnt == 200:
+            if cnt == num_invos:
                 break
 
         print(cnt)
@@ -118,7 +122,7 @@ def analyze(mode, results_dir, azure_type=None):
             jobs.append(gevent.spawn_later(
                 i * 5, analyze_workflow, workflow_name, mode))
         gevent.joinall(jobs)
-    print(e2e_dict)
+    print(f"e2e_dict: {e2e_dict}")
     e2e_latencies = []
     for workflow in workflow_pool:
         e2e_latencies.append(e2e_dict[workflow])
@@ -134,15 +138,14 @@ def prepare_invo_info(func_map_dict, app_map_dict, row):
     duration = row['duration']
     function_name = func_map_dict[row["func"]]
     workflow_name = app_map_dict[row['app']]
-    # duration = 2.22551
+    input_n = row.get("input_n", 30)
     azure_data = {
         "function_name": function_name,
         "duration": duration,
-        "input_n": 30
+        "input_n": input_n,
     }
-    # print(f"duration of {function_name} is {duration}")
-    print(
-        f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
+    # print(f"input_n of {function_name} is {input_n}")
+    # print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
     return start_ts_sec, workflow_name, azure_data
 
 
