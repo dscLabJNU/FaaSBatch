@@ -51,8 +51,10 @@ def generate_workflows(df, workflow_names, workflow_type):
     for app, data in df.groupby('app'):
         workflow_name = app_map_dict[app]
         workflow_name_prefix = '_'.join(workflow_name.split("_")[:4])
-        if workflow_name_prefix not in workflow_names:
-            continue
+        # 'all' in workflow_names indicates we use all workflows in benchmark
+        if "all" not in workflow_names:
+            if workflow_name_prefix not in workflow_names:
+                continue
         flat_workflow = {'functions': []}
         function_info = {'workflow': "", 'max_containers': 5, 'functions': []}
         print(f'generating workflow {workflow_name}')

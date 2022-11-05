@@ -4,3 +4,4 @@ __pycache__/
 .idea
 tmp/
 benchmark/generator/azure-bench/*workflows/
+*.log

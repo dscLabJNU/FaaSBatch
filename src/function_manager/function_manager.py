@@ -9,7 +9,7 @@ from sfs import SFS
 from baseline_batching import BaseBatching
 from port_controller import PortController
 from function import Function
-import random
+import subprocess
 import sys
 sys.path.append('../../config')
 import config
@@ -57,8 +57,13 @@ class FunctionManager:
                                 for group_name, functions in group_funcs_map.items()}
 
     def init(self):
-        print("Clearing previous containers.")
-        os.system('docker rm -f $(docker ps -aq --filter label=workflow)')
+        filter_cmd = "docker ps -aq --filter label=workflow"
+        proc = subprocess.Popen(filter_cmd, stdout=subprocess.PIPE, shell=True)
+
+        out, _ = proc.communicate()
+        if out:
+            print("Clearing previous containers.")
+            os.system(f"docker rm -f $({filter_cmd})")
 
         gevent.spawn_later(repack_clean_interval, self._clean_loop)
         gevent.spawn_later(dispatch_interval, self._dispatch_loop)
