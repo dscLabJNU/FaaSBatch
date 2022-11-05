@@ -95,7 +95,10 @@ func invokeFunction(req map[string]interface{}, responses map[string]interface{}
 	if entry, ok := req["azure_data"].(map[string]interface{}); ok {
 		inputN := strconv.Itoa(int(entry["input_n"].(float64)))
 		schedParams = append(schedParams, inputN)
-		activateSFS = entry["activate_SFS"].(bool)
+		// For SFS strategy
+		if activate, ok := entry["activate_SFS"].(bool); ok {
+			activateSFS = activate
+		}
 		log.Println("Actvated SFS scheduling: ", activateSFS)
 		// log.Printf("Runing python fip.py %s\n", inputN)
 	}
