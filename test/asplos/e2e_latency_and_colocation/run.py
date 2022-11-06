@@ -32,7 +32,8 @@ def run_workflow(workflow_name, request_id, azure_data=None):
             "azure_data": azure_data
         })
     try:
-        rep = requests.post(url, json=data, timeout=TIMEOUT)
+        # rep = requests.post(url, json=data, timeout=TIMEOUT)
+        rep = requests.post(url, json=data)
         return rep.json()['latency']
     except Exception:
         print(f'{workflow_name} timeout')
@@ -92,7 +93,7 @@ def analyze(mode, results_dir, azure_type=None):
         df = azure.df
         func_map_dict, app_map_dict = azure.load_mappers()
 
-        num_invos = 99999999
+        num_invos = 600
         filter_df = azure.filter_df(app_map_dict, num_invos)
 
         cnt = 0
