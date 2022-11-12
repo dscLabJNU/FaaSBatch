@@ -13,8 +13,8 @@ function execRemoteCMD() {
     exec_command=$3
     filter_result=$(ssh $remote_host $ps_command)
     if [ -n "$filter_result" ]; then
-        echo "Executing: ssh '$remote_host $exec_command'"
-        ssh $remote_host $exec_command
+        echo "Executing: ssh $remote_host '$exec_command'"
+        ssh $remote_host "$exec_command"
     else
         echo "Nothing to exec of cmd: [$ps_command] in host [$remote_host]"
     fi

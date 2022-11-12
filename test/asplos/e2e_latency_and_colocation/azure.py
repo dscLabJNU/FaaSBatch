@@ -4,6 +4,9 @@ import pandas as pd
 import math
 import customize_azure
 import json
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import os
 
 
 class Azure:
@@ -86,21 +89,38 @@ class Azure:
             input_values.extend(
                 [random.randint(min(num_range), max(num_range)) for _ in range(amounts)])
         filter_df = filter_df.reset_index().drop('index', axis=1)
-        
+
         # Shuffling the input list for randomness,
         random.shuffle(input_values)
         filter_df["input_n"] = pd.Series(input_values)
-        
+
         # Turn it on if you wants to check the distribution of input_values
         # self.validate_input_values(filter_df)
         return filter_df
+
+    def plot_RPS(self, df: pd.DataFrame):
+        os.system("mkdir -p imgs")
+        timeline = "0.005S"
+        df['invo_ts'] = df['invo_ts'] + pd.to_datetime(self.info['time_line_start'], utc=True)
+        df['invo_ts'] = pd.to_datetime(df['invo_ts'])
+        values = df.resample(timeline, on='invo_ts').count()['func']
+        values = values[values != 0]
+        fig, ax = plt.subplots(figsize=(10, 5))
+        x_list = values.index
+
+        xformatter = mdates.DateFormatter('%H:%M:%S')
+        plt.gcf().axes[0].xaxis.set_major_formatter(xformatter)
+        # ax.set_xlabel(f"Timeline (Day{day:02d})")
+        ax.set_ylabel("Concurrency")
+        ax.plot(x_list, values, lw=0.5)
+        fig.savefig("imgs/RPS.pdf", bbox_inches='tight')
 
     def filter_df(self, app_map_dict, num_invos):
         df = self.df
         azure_apps = self.info['workflow_names']
         start = self.info['time_line_start']
         end = self.info['time_line_end']
-        if azure_apps:
+        if "all" not in azure_apps:
             # 筛选出指定的 app
             print(f"Filtering apps: {azure_apps}")
             df = df[pd.Series(
@@ -120,7 +140,7 @@ class Azure:
         filter_df['invo_ts'] = pd.to_datetime(filter_df['invo_ts'], utc=True)
         filter_df['invo_ts'] = filter_df['invo_ts'] - \
             pd.to_datetime(start, utc=True)
-        
+
         # Picks top $(num_invos) of the filter_df for benchmarking
         if num_invos:
             filter_df = filter_df[:num_invos]

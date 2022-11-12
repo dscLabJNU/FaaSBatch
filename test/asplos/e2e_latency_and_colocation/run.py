@@ -20,7 +20,7 @@ import os
 repo = Repository()
 TEST_PER_WORKFLOW = 2 * 60
 TEST_CORUN = 2 * 60
-TIMEOUT = 60
+TIMEOUT = 100
 e2e_dict = {}
 
 
@@ -32,8 +32,8 @@ def run_workflow(workflow_name, request_id, azure_data=None):
             "azure_data": azure_data
         })
     try:
-        # rep = requests.post(url, json=data, timeout=TIMEOUT)
-        rep = requests.post(url, json=data)
+        rep = requests.post(url, json=data, timeout=TIMEOUT)
+        # rep = requests.post(url, json=data)
         return rep.json()['latency']
     except Exception:
         print(f'{workflow_name} timeout')
@@ -93,8 +93,10 @@ def analyze(mode, results_dir, azure_type=None):
         df = azure.df
         func_map_dict, app_map_dict = azure.load_mappers()
 
-        num_invos = 600
+        num_invos = 100
         filter_df = azure.filter_df(app_map_dict, num_invos)
+        print("Ploting RPS of the Azure dataset...")
+        azure.plot_RPS(filter_df.copy())
 
         cnt = 0
         jobs = []
@@ -102,11 +104,10 @@ def analyze(mode, results_dir, azure_type=None):
         for i, row in filter_df.iterrows():
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(
                 func_map_dict, app_map_dict, row)
-            # if "azure_func_00000410" not in azure_data['function_name']:
-            # continue
-            jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
+            # jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
+                        # workflow_name=workflow_name, azure_data=azure_data))
+            jobs.append(gevent.spawn_later(0.01, analyze_azure_workflow,
                         workflow_name=workflow_name, azure_data=azure_data))
-            # jobs.append(gevent.spawn(analyze_azure_workflow, workflow_name=workflow_name, azure_data=azure_data))
             workflow_pool.append(workflow_name)
             cnt += 1
             if cnt == num_invos:
