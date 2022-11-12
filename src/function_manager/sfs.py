@@ -37,14 +37,9 @@ class SFS(FunctionGroup):
         if not SFS.log_file:
             SFS.log_file = open(
                 "./tmp/latency_amplification_SFS.csv", 'w')
-            """
-            schedule_time:  The time from receiving the request to sending the request to the container,
-                including cold start and time overhead of the strategy
-            queue_time:     Queue time of the request in the container
-            exec_time:      CPU time
-            """
-            print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms)",
-                  file=SFS.log_file, flush=True)
+            SFS.function_load_log = open("./tmp/function_load_SFS.csv", "w")
+            self.init_logs(invocation_log=SFS.log_file,
+                           function_load_log=SFS.function_load_log)
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         res = super().send_request(function, request_id,
@@ -102,6 +97,9 @@ class SFS(FunctionGroup):
             return
 
         function = local_rq[0].function
+        print(f"{function.info.function_name},{len(local_rq)}",
+              file=SFS.function_load_log, flush=True)
+        # return
         # Create or get containers
         candidate_containers = self.dynamic_reactive_scaling(
             function=function, local_rq=local_rq)
@@ -146,18 +144,4 @@ class SFS(FunctionGroup):
             self.put_container(container)
 
             for req in requests:
-                self.record_info(req)
-
-    def record_info(self, req):
-        print(
-            f"request {req.function.info.function_name} is done, recording the execution infomation...")
-        self.historical_reqs.append(req)
-        self.history_duration.append(req.duration)
-        result = req.result.get()
-        exec_time = result['exec_time']
-        print(f"exec_time vs. duration: {exec_time}:{req.duration}")
-        queue_time = result.get('queue_time', 0)
-        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time}",
-              file=SFS.log_file, flush=True)
-        if req.defer:
-            self.defer_times.append(req.defer)
+                self.record_info(req=req, log_file=SFS.log_file)

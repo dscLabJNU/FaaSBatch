@@ -1,3 +1,4 @@
+import config
 import logging
 from function_group import FunctionGroup
 import numpy as np
@@ -69,14 +70,10 @@ class Kraken(FunctionGroup):
         if not Kraken.log_file:
             Kraken.log_file = open(
                 "./tmp/latency_amplification_kraken.csv", 'w')
-            """
-            schedule_time:  The time from receiving the request to sending the request to the container,
-                including cold start and time overhead of the strategy
-            queue_time:     Queue time of the request in the container
-            exec_time:      CPU time
-            """
-            print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms)",
-                  file=Kraken.log_file, flush=True)
+            Kraken.function_load_log = open(
+                "./tmp/function_load_Kraken.csv", "w")
+            self.init_logs(invocation_log=Kraken.log_file,
+                           function_load_log=Kraken.function_load_log)
             # Note that we will only do this once when initializing the Class
             Kraken.function_load = read_function_load()
 
@@ -91,7 +88,8 @@ class Kraken(FunctionGroup):
         try:
             next_load = Kraken.function_load[function_name].pop(0)
         except:
-            logging.warning(f"Kraken.function_load[function_name]: {Kraken.function_load[function_name]}")
+            logging.warning(
+                f"Kraken.function_load[function_name]: {Kraken.function_load[function_name]}")
             raise IndexError(f"Poping function load of {function_name} failed")
         return next_load
 
@@ -125,7 +123,8 @@ class Kraken(FunctionGroup):
     def dynamic_reactive_scaling(self, function, local_rq):
         """Create containers according to the strategy
         """
-        num_containers = self.estimate_container(local_rq=local_rq, function=function)
+        num_containers = self.estimate_container(
+            local_rq=local_rq, function=function)
         concurrency = len(local_rq)
         container_retrieved = 0
 
@@ -171,6 +170,9 @@ class Kraken(FunctionGroup):
             return
 
         function = local_rq[0].function
+        # print(f"{function.info.function_name},{len(local_rq)}",
+            #   file=Kraken.function_load_log, flush=True)
+        # return
         if "cpu_optimize" in function.info.function_name:
             raise ValueError(
                 "Wrong function type (cpu_optimize) for Kraken strategy")
@@ -221,18 +223,4 @@ class Kraken(FunctionGroup):
             self.put_container(container)
 
             for req in requests:
-                self.record_info(req)
-
-    def record_info(self, req):
-        print(
-            f"request {req.function.info.function_name} is done, recording the execution infomation...")
-        self.historical_reqs.append(req)
-        self.history_duration.append(req.duration)
-        result = req.result.get()
-        print(f"Result is: {result}")
-        exec_time = result['exec_time']
-        queue_time = result.get('queue_time', 0)
-        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time}",
-              file=Kraken.log_file, flush=True)
-        if req.defer:
-            self.defer_times.append(req.defer)
+                self.record_info(req=req, log_file=Kraken.log_file)
