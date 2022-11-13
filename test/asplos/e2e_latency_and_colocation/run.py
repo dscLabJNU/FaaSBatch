@@ -93,7 +93,7 @@ def analyze(mode, results_dir, azure_type=None):
         df = azure.df
         func_map_dict, app_map_dict = azure.load_mappers()
 
-        num_invos = 100
+        num_invos = 800
         filter_df = azure.filter_df(app_map_dict, num_invos)
         print("Ploting RPS of the Azure dataset...")
         azure.plot_RPS(filter_df.copy())
@@ -104,10 +104,10 @@ def analyze(mode, results_dir, azure_type=None):
         for i, row in filter_df.iterrows():
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(
                 func_map_dict, app_map_dict, row)
-            # jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
-                        # workflow_name=workflow_name, azure_data=azure_data))
-            jobs.append(gevent.spawn_later(0.01, analyze_azure_workflow,
+            jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
                         workflow_name=workflow_name, azure_data=azure_data))
+            # jobs.append(gevent.spawn_later(0.01, analyze_azure_workflow,
+                        # workflow_name=workflow_name, azure_data=azure_data))
             workflow_pool.append(workflow_name)
             cnt += 1
             if cnt == num_invos:

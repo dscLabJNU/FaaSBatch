@@ -21,23 +21,23 @@ function execRemoteCMD() {
 }
 
 function clean_monitor() {
+    remote_hosts=$@
     echo -e "1. Cleaning monitor processes in remote hosts..."
     ps_command="ps -ef | grep -v grep |grep -E 'monitor_resources'"
     exec_command="$ps_command | awk '{print \$2}'| xargs kill -9"
-
-    execRemoteCMD "dev-01" "${ps_command}" "${exec_command}"
-    execRemoteCMD "dev-02" "${ps_command}" "${exec_command}"
-    execRemoteCMD "dev-04" "${ps_command}" "${exec_command}"
+    for remote_host in ${remote_hosts[@]}; do
+        execRemoteCMD "$remote_host" "${ps_command}" "${exec_command}"
+    done
 }
 
 function clean_proxy_gateway() {
+    remote_hosts=$@
     echo -e "\n2. Cleaning proxy processes in remote hosts..."
     ps_proxy_cmd="ps -ef | grep -v grep |grep -E 'python3 proxy.py' | awk '{print \$2}'"
     exec_command="sudo kill -9 \$($ps_proxy_cmd)"
-
-    execRemoteCMD "dev-01" "${ps_proxy_cmd}" "${exec_command}"
-    execRemoteCMD "dev-02" "${ps_proxy_cmd}" "${exec_command}"
-    execRemoteCMD "dev-04" "${ps_proxy_cmd}" "${exec_command}"
+    for remote_host in ${remote_hosts[@]}; do
+        execRemoteCMD "${remote_host}" "${ps_proxy_cmd}" "${exec_command}"
+    done
 
     ps_gateway_cmd="ps -ef | grep -v grep |grep -E 'python3 gateway.py' | awk '{print \$2}'"
     exec_command="sudo kill -9 \$($ps_gateway_cmd)"
@@ -45,21 +45,23 @@ function clean_proxy_gateway() {
 }
 
 function clean_previous_containers() {
+    remote_hosts=$@
     echo -e "\n3. Cleaning containers in remote hosts..."
     ps_command="docker ps -aq --filter label=workflow"
     exec_command="docker rm -f \$($ps_command) >/dev/null 2>&1"
-    execRemoteCMD "dev-01" "${ps_command}" "${exec_command}"
-    execRemoteCMD "dev-02" "${ps_command}" "${exec_command}"
-    execRemoteCMD "dev-04" "${ps_command}" "${exec_command}"
+    for remote_host in ${remote_hosts[@]}; do
+        execRemoteCMD "${remote_host}" "${ps_command}" "${exec_command}"
+    done
 }
 
 function rm_utilization_log() {
     strategy=$1
+    remote_hosts=${@:2}
     echo -e "\n4. Removing utilization log of strategy $strategy"
     rm_utilization_log_cmd="rm -rf /home/vagrant/openwhisk-resource-monitor/utilization_$strategy.csv"
-    ssh dev-01 $rm_utilization_log_cmd
-    ssh dev-02 $rm_utilization_log_cmd
-    ssh dev-04 $rm_utilization_log_cmd
+    for remote_host in ${remote_hosts[@]}; do
+        ssh $remote_host $rm_utilization_log_cmd
+    done
 
 }
 
@@ -67,6 +69,7 @@ function run_proxy_gateway() {
     echo -e "\n5. Staring proxy (and gateway) processes in remote hosts"
 
     strategy=$1
+    remote_hosts=${@:2}
     cd_cmd="cd /home/vagrant/batching-request/src/workflow_manager"
     export_cmd="export strategy=$strategy"
 
@@ -76,59 +79,65 @@ function run_proxy_gateway() {
     ps_gateway_cmd="${cd_cmd}; ${export_cmd}; ls run-gateway.sh;"
     launch_gateway_cmd="${ps_gateway_cmd} nohup bash run-gateway.sh"
 
-    execRemoteCMD "dev-01" "${ps_proxy_cmd}" "${launch_proxy_cmd} 10.0.0.101 > proxy_$strategy.log &"
-    execRemoteCMD "dev-02" "${ps_proxy_cmd}" "${launch_proxy_cmd} 10.0.0.102 > proxy_$strategy.log &"
+    for remote_host in ${remote_hosts[@]}; do
+        ip=$(awk -F= '/'$remote_host'_ip/{print $2}' experiment.config)
+        execRemoteCMD "${remote_host}" "${ps_proxy_cmd}" "${launch_proxy_cmd} "$ip" > proxy_$strategy.log &"
+    done
+
     execRemoteCMD "dev-03" "${ps_proxy_cmd}" "${launch_gateway_cmd} 10.0.0.103 > gateway_$strategy.log &"
-    execRemoteCMD "dev-04" "${ps_proxy_cmd}" "${launch_proxy_cmd} 10.0.0.104  > proxy_$strategy.log &"
 
 }
 
 function run_monitor() {
     strategy=$1
+    remote_hosts=${@:2}
     run_monitor_cmd="cd ~/openwhisk-resource-monitor; nohup ./monitor_resources.sh > utilization_$strategy.csv &"
-    ssh dev-01 $run_monitor_cmd
-    ssh dev-02 $run_monitor_cmd
-    ssh dev-04 $run_monitor_cmd
+    for remote_host in ${remote_hosts[@]}; do
+        ssh $remote_host $run_monitor_cmd
+    done
     echo "Run remote monitor processes done... now need to wait for 40 s"
 }
 
 function usage() {
-    echo -e "Usage: $0 [Batching, BaseBatching, Kraken, SFS]"
+    echo -e "Usage: $0 [Batching, BaseBatching, Kraken, SFS] [cpu, io]"
 }
 
-if [[ $# -lt 1 ]]; then
+if [[ $# -lt 2 ]]; then
     usage
 else
     strategy=$1
-    clean_monitor
-    clean_proxy_gateway
-    clean_previous_containers
+    azure_type=$2
+    remote_hosts=${@:3}
 
-    rm_utilization_log $strategy
-    run_proxy_gateway $strategy
-    echo "Wait 20 seconds for launching proxy and gateway"
-    sleep 20
+    clean_monitor $remote_hosts
+    clean_proxy_gateway $remote_hosts
+    clean_previous_containers $remote_hosts
+
+    rm_utilization_log $strategy $remote_hosts
+    run_proxy_gateway $strategy $remote_hosts
+    echo "Wait 5 seconds for launching proxy and gateway"
+    sleep 5
 
     # 1. Run monitor before benchmarking
-    run_monitor $strategy
+    run_monitor $strategy $remote_hosts
 
     echo "Now running benchmark..."
     case "$strategy" in
     "Batching")
-        python3 run.py --mode azure_bench --azure_type cpu_optimize
+        python3 run.py --mode azure_bench --azure_type ${azure_type}
         ;;
     "BaseBatching")
-        python3 run.py --mode azure_bench --azure_type cpu_native
+        python3 run.py --mode azure_bench --azure_type ${azure_type}
         ;;
     "SFS")
-        python3 run.py --mode azure_bench --azure_type cpu_native
+        python3 run.py --mode azure_bench --azure_type ${azure_type}
         ;;
     "Kraken")
-        python3 run.py --mode azure_bench --azure_type cpu_native
+        python3 run.py --mode azure_bench --azure_type ${azure_type}
         ;;
     *)
         usage
         ;;
     esac
-    clean_monitor
+    clean_monitor $remote_hosts
 fi

@@ -4,8 +4,8 @@ function clean_proxy_gateway() {
     exec_command="sudo kill -9 \$($ps_proxy_cmd)"
 
     execRemoteCMD "dev-01" "${ps_proxy_cmd}" "${exec_command}"
-    execRemoteCMD "dev-02" "${ps_proxy_cmd}" "${exec_command}"
-    execRemoteCMD "dev-04" "${ps_proxy_cmd}" "${exec_command}"
+    # execRemoteCMD "dev-02" "${ps_proxy_cmd}" "${exec_command}"
+    # execRemoteCMD "dev-04" "${ps_proxy_cmd}" "${exec_command}"
 
     ps_gateway_cmd="ps -ef | grep -v grep |grep -E 'python3 gateway.py' | awk '{print \$2}'"
     exec_command="sudo kill -9 \$($ps_gateway_cmd)"
@@ -32,7 +32,7 @@ function clean_monitor() {
     exec_command="$ps_command | awk '{print \$2}'| xargs kill -9"
 
     execRemoteCMD "dev-01" "${ps_command}" "${exec_command}"
-    execRemoteCMD "dev-02" "${ps_command}" "${exec_command}"
+    # execRemoteCMD "dev-02" "${ps_command}" "${exec_command}"
     execRemoteCMD "dev-04" "${ps_command}" "${exec_command}"
 }
 
