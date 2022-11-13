@@ -36,9 +36,9 @@ class BaseBatching(FunctionGroup):
 
         if not BaseBatching.log_file:
             BaseBatching.log_file = open(
-                "./tmp/latency_amplification_baseline.csv", 'w')
+                "./tmp/latency_amplification_BaseBatching.csv", 'w')
             BaseBatching.function_load_log = open(
-                "./tmp/function_load_baseline.csv", "w")
+                "./tmp/function_load_BaseBatching.csv", "w")
             self.init_logs(invocation_log=BaseBatching.log_file,
                            function_load_log=BaseBatching.function_load_log)
 
@@ -73,7 +73,7 @@ class BaseBatching(FunctionGroup):
         logging.info(f"Get {container_retrieved} of containers from the pool")
 
         # 2. Create remaining containers
-        new_containers = self.create_containers_in_blocking(
+        new_containers = self.create_containers_in_parallel(
             num_containers=num_containers - container_retrieved, function=function)
 
         candidate_containers.extend(new_containers)

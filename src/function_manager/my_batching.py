@@ -33,7 +33,7 @@ class Batching(FunctionGroup):
 
         if not Batching.log_file:
             Batching.log_file = open(
-                "./tmp/latency_amplification_my_batching.csv", 'w')
+                "./tmp/latency_amplification_Batching.csv", 'w')
             Batching.function_load_log = open(
                 "./tmp/function_load_Batching.csv", "w")
             self.init_logs(invocation_log=Batching.log_file,

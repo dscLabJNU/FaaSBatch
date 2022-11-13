@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 batching_path = "/home/vagrant/batching-request"
-baseline_csv = f"{batching_path}/src/workflow_manager/tmp/latency_amplification_baseline.csv"
+baseline_csv = f"{batching_path}/src/workflow_manager/tmp/latency_amplification_BaseBatching.csv"
 if not os.path.exists(baseline_csv):
     raise ValueError(
         "Cannot find baseline csv for caculating SLOs. Please executes baseline strategy according to the README.md")

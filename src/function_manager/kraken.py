@@ -20,10 +20,10 @@ import config
 
 def read_function_load():
     batching_path = config.PROJECT_PATH
-    csv = f"{batching_path}/src/workflow_manager/tmp/function_load.csv"
+    csv = f"{batching_path}/src/workflow_manager/tmp/function_load_BaseBatching.csv"
     if not os.path.exists(csv):
         raise ValueError(
-            "Cannot find function_load.csv. Please executes baseline strategy according to the README.md")
+            "Cannot find function_load_BaseBatching.csv. Please executes baseline strategy according to the README.md")
 
     df_baseline = pd.read_csv(csv)
     groupby_func = df_baseline.groupby("function")
@@ -69,7 +69,7 @@ class Kraken(FunctionGroup):
 
         if not Kraken.log_file:
             Kraken.log_file = open(
-                "./tmp/latency_amplification_kraken.csv", 'w')
+            "./tmp/latency_amplification_Kraken.csv", 'w')
             Kraken.function_load_log = open(
                 "./tmp/function_load_Kraken.csv", "w")
             self.init_logs(invocation_log=Kraken.log_file,
