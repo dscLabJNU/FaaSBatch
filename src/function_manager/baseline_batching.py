@@ -36,18 +36,11 @@ class BaseBatching(FunctionGroup):
 
         if not BaseBatching.log_file:
             BaseBatching.log_file = open(
-                "./tmp/latency_amplification_baseline.csv", 'w')
+                "./tmp/latency_amplification_BaseBatching.csv", 'w')
             BaseBatching.function_load_log = open(
-                "./tmp/function_load.csv", "w")
-            """
-            schedule_time:  The time from receiving the request to sending the request to the container,
-                including cold start and time overhead of the strategy
-            queue_time:     Queue time of the request in the container
-            exec_time:      CPU time
-            """
-            print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms)",
-                  file=BaseBatching.log_file, flush=True)
-            print("function,load", file=BaseBatching.function_load_log, flush=True)
+                "./tmp/function_load_BaseBatching.csv", "w")
+            self.init_logs(invocation_log=BaseBatching.log_file,
+                           function_load_log=BaseBatching.function_load_log)
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         res = super().send_request(function, request_id,
@@ -80,7 +73,7 @@ class BaseBatching(FunctionGroup):
         logging.info(f"Get {container_retrieved} of containers from the pool")
 
         # 2. Create remaining containers
-        new_containers = self.create_containers_in_blocking(
+        new_containers = self.create_containers_in_parallel(
             num_containers=num_containers - container_retrieved, function=function)
 
         candidate_containers.extend(new_containers)
@@ -149,18 +142,4 @@ class BaseBatching(FunctionGroup):
             self.put_container(container)
 
             for req in requests:
-                self.record_info(req)
-
-    def record_info(self, req):
-        print(
-            f"request {req.function.info.function_name} is done, recording the execution infomation...")
-        self.historical_reqs.append(req)
-        self.history_duration.append(req.duration)
-        result = req.result.get()
-        exec_time = result['exec_time']
-        print(f"exec_time vs. duration: {exec_time}:{req.duration}")
-        queue_time = result.get('queue_time', 0)
-        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time}",
-              file=BaseBatching.log_file, flush=True)
-        if req.defer:
-            self.defer_times.append(req.defer)
+                self.record_info(req=req, log_file=BaseBatching.log_file)

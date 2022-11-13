@@ -15,7 +15,7 @@ core_manager = CoreManaerger(
 
 
 class Batching(FunctionGroup):
-    log_file_flag = False
+    log_file = None
 
     def __init__(self, name, functions, docker_client, port_controller) -> None:
         super().__init__(name, functions, docker_client, port_controller)
@@ -31,20 +31,13 @@ class Batching(FunctionGroup):
         self.executing_rqs = []
         self.historical_reqs = []
 
-        if not Batching.log_file_flag:
-            global log_file
-            log_file = open(
-                "./tmp/latency_amplification_my_batching.csv", 'w')
-
-            """
-            schedule_time:  The time from receiving the request to sending the request to the container,
-                including cold start and time overhead of the strategy
-            queue_time:     Queue time of the request in the container
-            exec_time:      CPU time
-            """
-            print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms)",
-                  file=log_file, flush=True)
-            Batching.log_file_flag = True
+        if not Batching.log_file:
+            Batching.log_file = open(
+                "./tmp/latency_amplification_Batching.csv", 'w')
+            Batching.function_load_log = open(
+                "./tmp/function_load_Batching.csv", "w")
+            self.init_logs(invocation_log=Batching.log_file,
+                           function_load_log=Batching.function_load_log)
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         res = super().send_request(function, request_id,
@@ -237,6 +230,9 @@ class Batching(FunctionGroup):
             return
 
         function = local_rq[0].function
+        # print(f"{function.info.function_name},{len(local_rq)}",
+            #   file=Batching.function_load_log, flush=True)
+        # return
         # Create or get containers
         candidate_containers = self.dynamic_reactive_scaling(
             function=function, local_rq=local_rq)
@@ -282,19 +278,4 @@ class Batching(FunctionGroup):
 
             core_manager.release_busy_cores(container)
             for req in requests:
-                self.record_info(req)
-
-    def record_info(self, req):
-        print(
-            f"request {req.function.info.function_name} is done, recording the execution infomation...")
-        self.historical_reqs.append(req)
-        self.history_duration.append(req.duration)
-        result = req.result.get()
-        print(f"Result is: {result}")
-        exec_time = result['exec_time']
-        # No queuing in our proposed method, all requests are invoked in parallel
-        queue_time = result.get('queue_time', 0)
-        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time}",
-              file=log_file, flush=True)
-        if req.defer:
-            self.defer_times.append(req.defer)
+                self.record_info(req=req, log_file=Batching.log_file)

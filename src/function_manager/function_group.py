@@ -63,8 +63,19 @@ class FunctionGroup():
 
         self.b = BoundedSemaphore()
 
-    # put the request into request queue
+    def init_logs(self, invocation_log, function_load_log):
+        """
+            schedule_time:  The time from receiving the request to sending the request to the container,
+                including cold start and time overhead of the strategy
+            queue_time:     Queue time of the request in the container
+            exec_time:      CPU time
+            used_memory:    Memory consumption for the io functions
+        """
+        print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms),used_memory(MB)",
+              file=invocation_log, flush=True)
+        print("function,load", file=function_load_log, flush=True)
 
+    # put the request into request queue
     def send_request(self, function, request_id, runtime, input, output, to, keys, azure_data=None):
         function_id = function.info.function_name + "-" + str(uuid.uuid4())
         data = {'request_id': request_id, 'runtime': runtime,
@@ -77,48 +88,7 @@ class FunctionGroup():
 
     # receive a request from upper layer
     def dispatch_request(self, container=None):
-        # no request to dispatch
-        if len(self.rq) - self.num_processing == 0:
-            return
-        if len(self.rq) == 0:
-            return 0
-        self.num_processing += 1
-        function = self.rq[0].function
-
-        function_names = [rq.function.info.function_name for rq in self.rq]
-        print(
-            f"{self.name} has {len(function_names)} of function waiting to shedule: {function_names}")
-
-        # 1. try to get a workable container from pool
-        # container = function.self_container()
-        container = self.self_container(function)
-
-        # create a new container
-        while container is None:
-            # container = function.create_container()
-            container = self.create_container(function)
-
-        # the number of exec container hits limit
-        if container is None:
-            self.num_processing -= 1
-            return
-
-        while self.rq:
-            self.num_processing -= 1
-            print(
-                f"The length of rq in this {self.name} group is {len(self.rq)}")
-
-            req = self.rq.pop(0)
-            print(
-                f"Ready for batching request {req.function.info.function_name} in container {container.img_name}...")
-
-            res = container.send_request(req.data)
-            # res = {"res": 'ok'}
-            req.result.set(res)
-
-        # 3. put the container back into pool
-        # function.put_container(container)
-        self.put_container(container)
+        pass
 
     # get a container from container pool
     # if there's no container in pool, return None
@@ -261,6 +231,23 @@ class FunctionGroup():
         # time consuming work is put here
         for c in old_container:
             self.remove_container(c)
+
+    def record_info(self, req, log_file):
+        print(
+            f"request {req.function.info.function_name} is done, recording the execution infomation...")
+        self.historical_reqs.append(req)
+        self.history_duration.append(req.duration)
+        result = req.result.get()
+        print(f"Result is: {result}")
+        exec_time = result['exec_time']
+        # No queuing in our proposed method, all requests are invoked in parallel
+        queue_time = result.get('queue_time', 0)
+        # Only available in client creation evaluation
+        mem_used = result.get("mem_used", None)
+        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time},{mem_used}",
+              file=log_file, flush=True)
+        if req.defer:
+            self.defer_times.append(req.defer)
 
 
 # life time of three different kinds of containers

@@ -3,7 +3,9 @@ import threading
 import time
 from flask import Flask, request
 from gevent.pywsgi import WSGIServer
-from main import main as __main__
+# from main import main as __main__
+import json
+import subprocess
 default_file = 'main.py'
 work_dir = '/proxy'
 work_dir = './'
@@ -42,10 +44,11 @@ class Runner:
         return out
 
     def batch_run(self, req, responses):
-        responses[req['function_id']] = __main__(req)
+        out_bytes = subprocess.check_output(["python3", "main.py"])
+        result = out_bytes.decode('utf8').replace("'", '"')
+        responses[req["function_id"]] = json.loads(result)
+        # responses[req['function_id']] = __main__(req)
         print("INVOKING")
-        # return {"request_id": req['request_id'], "out": __main__(req)}
-
 
 proxy = Flask(__name__)
 proxy.status = 'new'

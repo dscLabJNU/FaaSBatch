@@ -7,6 +7,8 @@ BUCKET = "openwhiskbucket"
 FOLDER = "finra/data"
 
 PORTFOLIOS = "portfolios.json"
+
+
 def get_s3_instance(args):
     service_name = args.get("service_name", 's3')
     aws_access_key_id = args.get("aws_access_key_id", "AKIAUDE724LEOTYERSHO")
@@ -19,10 +21,10 @@ def get_s3_instance(args):
     start = time.time()
     session = boto3.session.Session()
     s3 = session.client(service_name=service_name,
-                      aws_access_key_id=aws_access_key_id,
-                      aws_secret_access_key=aws_secret_access_key,
-                      region_name=region_name,
-                      use_ssl=False)
+                        aws_access_key_id=aws_access_key_id,
+                        aws_secret_access_key=aws_secret_access_key,
+                        region_name=region_name,
+                        use_ssl=False)
     time_s3_create = time.time() - start
     return s3, bucket_name, bucket_key, time_s3_create * 1000
 
@@ -34,8 +36,13 @@ def main(args=None):
     # log_file = open(f"./logs/s3_resource.csv", 'a')
     
     mem_before = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-    _,_,_, time_s3_create = get_s3_instance({})
-    mem = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024 - mem_before
+    _, _, _, exec_time = get_s3_instance({})
+    mem_after = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+    mem_used = mem_after - mem_before
     # print(f"{time_s3_create},{mem},{concurrency}", file=log_file, flush=True)
-
-    return {"time_s3_create": time_s3_create, "mem_used": mem, "concurrency": concurrency}
+    # mem_info = {
+    #     "mem_before": mem_before,
+    #     "mem_after": mem_after,
+    #     "mem_used": mem_used,
+    # }
+    return {"exec_time": exec_time, "mem_used": mem_used, "concurrency": concurrency}
