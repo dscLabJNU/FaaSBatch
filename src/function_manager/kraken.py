@@ -90,7 +90,8 @@ class Kraken(FunctionGroup):
         except:
             logging.warning(
                 f"Kraken.function_load[function_name]: {Kraken.function_load[function_name]}")
-            raise IndexError(f"Poping function load of {function_name} failed")
+            return current_load
+            # raise IndexError(f"Poping function load of {function_name} failed")
         return next_load
 
     def estimate_container(self, local_rq, function) -> int:
@@ -111,7 +112,7 @@ class Kraken(FunctionGroup):
         predict_load = self.predict_load(function_name, current_load)
 
         # batches = 0 if predict_load is zero, because some functions may have only one invocation
-        batches = math.ceil(predict_load / batch_size) or 1
+        batches = math.ceil(predict_load / batch_size) or len(local_rq)
 
         logging.info(
             f"avg. duration is {avg_duration}, now set the batch size as {batches}")

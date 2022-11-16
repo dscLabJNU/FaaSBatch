@@ -27,12 +27,13 @@ func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[
 	defer wg.Done()
 	functionId, _ := req["function_id"].(string)
 
-	var schedParams = []string{"schedtool", "-N", "-a", core, "-e", "python3", "fib.py"}
+	// var schedParams = []string{"schedtool", "-N", "-a", core, "-e", "python3", "fib.py"}
+	var schedParams = []string{ "python3", "fib.py"}
 	// var schedParams = []string{"schedtool", "-F", "-p", "20", "-a", core, "-e", "python3", "fib.py"}
 	if entry, ok := req["azure_data"].(map[string]interface{}); ok {
 		inputN := strconv.Itoa(int(entry["input_n"].(float64)))
 		schedParams = append(schedParams, inputN)
-		log.Printf("Runing python fip.py [%s] with schedtool in core %s \n", inputN, core)
+		// log.Printf("Runing python fip.py [%s] with schedtool in core %s \n", inputN, core)
 	}
 	log.Println("cmdParams:", schedParams)
 
@@ -89,7 +90,7 @@ func batch_run(c *gin.Context) {
 	log.Println("coreList:", coreList)
 	for i, req := range reqs {
 		core := strconv.Itoa(coreList[i%len(coreList)])
-		log.Printf("Assigning core %s to go-routine %d", core, i)
+		// log.Printf("Assigning core %s to go-routine %d", core, i)
 		wg.Add(1)
 		go parallel_exe(req, wg, responses, core)
 	}

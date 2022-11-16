@@ -71,7 +71,7 @@ class FunctionGroup():
             exec_time:      CPU time
             used_memory:    Memory consumption for the io functions
         """
-        print(f"function,schedule_time(ms),exec_time(ms),queue_time(ms),used_memory(MB)",
+        print(f"function,container_name,schedule_time(ms),cold_start(ms),exec_time(ms),queue_time(ms),used_memory(MB),input_n",
               file=invocation_log, flush=True)
         print("function,load", file=function_load_log, flush=True)
 
@@ -102,6 +102,7 @@ class FunctionGroup():
                   function.info.function_name, len(self.container_pool))
 
             res = self.container_pool.pop(-1)
+            res.cold_start = 0
             self.num_exec += 1
         self.b.release()
         return res
@@ -244,7 +245,10 @@ class FunctionGroup():
         queue_time = result.get('queue_time', 0)
         # Only available in client creation evaluation
         mem_used = result.get("mem_used", None)
-        print(f"{req.function.info.function_name},{req.get_schedule_time()},{exec_time},{queue_time},{mem_used}",
+        container_name = req.data['container_name']
+        input_n = req.data['azure_data']['input_n']
+        cold_start = req.data['cold_start']
+        print(f"{req.function.info.function_name},{container_name},{req.get_schedule_time()},{cold_start},{exec_time},{queue_time},{mem_used},{input_n}",
               file=log_file, flush=True)
         if req.defer:
             self.defer_times.append(req.defer)

@@ -19,9 +19,11 @@ class Container:
             bind_cpus_str = ','.join(list(map(lambda x: str(x), bind_cpus)))
             run_params.update({"cpuset_cpus": bind_cpus_str})
         print(f"run_params: {run_params}")
+        start = time.time()
         container = client.containers.run(image_name, **run_params)
         res = cls(container, port, attr)
         res.wait_start()
+        res.cold_start = (time.time() - start) * 1000  # Converts s to ms
         return res
 
     # get the wrapper of an existed container
@@ -35,6 +37,7 @@ class Container:
         self.container = container
         self.port = port
         self.attr = attr
+        self.cold_start = None
         self.lasttime = time.time()
 
     # wait for the container cold start
@@ -68,6 +71,8 @@ class Container:
         for req in reqs:
             executing_rqs.append(req)
             req.start_exec = time.time()
+            req.data['container_name'] = self.container.name
+            req.data['cold_start'] = self.cold_start
             print(f"executing req: {req.function_id}")
 
         d_list = list(map(lambda x: x.data, reqs))
