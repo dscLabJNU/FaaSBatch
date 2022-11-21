@@ -40,7 +40,7 @@ case "$azure_type" in
     remote_hosts=${@:2}
     latency_csv_prefix="latency_amplification_%s%s.csv"
     utilization_csv_prefix="utilization_%s%s.csv"
-    results_dir="/home/vagrant/batching-request/test/asplos/e2e_latency_and_colocation/results"
+    results_dir="$(cd "$(dirname "$0")"; pwd;)/results"
     strategies=(BaseBatching Kraken Batching SFS)
 
     path_to_save_csvs=$results_dir/$azure_type

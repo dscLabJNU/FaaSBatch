@@ -93,7 +93,7 @@ def analyze(mode, results_dir, azure_type=None):
         df = azure.df
         func_map_dict, app_map_dict = azure.load_mappers()
 
-        num_invos = 800
+        num_invos = 100
         filter_df = azure.filter_df(app_map_dict, num_invos)
         print("Ploting RPS of the Azure dataset...")
         azure.plot_RPS(filter_df.copy())

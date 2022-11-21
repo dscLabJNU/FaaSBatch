@@ -31,14 +31,14 @@ else
     case "$azure_type" in
     "cpu" | "io")
         runStrategy $azure_type ${remote_hosts[@]}
-        bash fetch_results.sh $azure_type ${remote_hosts[@]}
+        # bash fetch_results.sh $azure_type ${remote_hosts[@]}
         ;;
     "all")
         runStrategy io ${remote_hosts[@]}
-        bash fetch_results.sh io ${remote_hosts[@]}
+        # bash fetch_results.sh io ${remote_hosts[@]}
         
         runStrategy cpu ${remote_hosts[@]}
-        bash fetch_results.sh cpu ${remote_hosts[@]}
+        # bash fetch_results.sh cpu ${remote_hosts[@]}
         ;;
     esac
 fi
