@@ -118,7 +118,7 @@ def get_container_names():
 
 def print_strategy_info():
     if config.REQUEST_BATCHING:
-        print(f"Running proxy with strategy = {config.STRATEGY}")
+        print(f"Running proxy with strategy = {config.STRATEGY}, dispatch_interval = {config.DISPATCH_INTERVAL}")
     else:
         print(f"Running proxy with strategy = FaaSFlow")
 from gevent.pywsgi import WSGIServer

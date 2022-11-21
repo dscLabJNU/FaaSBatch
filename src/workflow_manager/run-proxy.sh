@@ -4,8 +4,11 @@ function usage() {
 
 function kill_SFS(){
     echo "Killing sfs-scheduler..."
-    kill_cmd=$(ps -ef | grep -E "./sfs-scheduler" | grep -v grep | awk '{print $2}')
-    kill $kill_cmd
+    ps_command=$(ps -ef | grep -E "./sfs-scheduler" | grep -v grep | awk '{print $2}')
+    if [ -n "$ps_command" ]; then
+        echo "Executing: kill $ps_command"
+        kill -9 $ps_command
+    fi
 }
 
 function check_ip(){
@@ -39,8 +42,10 @@ if [[ ${strategy} == "SFS" ]]; then
     echo "launching SFS scheduler..."
     source ../../config/constants.config
     cd $SFSPath
-    nohup bash run.sh &> SFS.out&
+    nohup bash run.sh > SFS.out&
     cd -
 fi
+echo "launching proxy..."
 python3 proxy.py $ip 8000
+kill_SFS
 fi
