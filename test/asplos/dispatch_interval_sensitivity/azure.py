@@ -118,9 +118,8 @@ class Azure:
         ax.set_ylabel("Concurrency", weight='bold')
         ax.set_xlabel("Timeline", weight='bold')
         ax.plot(x_list, values, lw=2)
-        plt.xticks(fontsize=8)
+        # plt.xticks(fontsize=8)
         fig.savefig("imgs/benchWorkloadRPS.pdf", bbox_inches='tight')
-        exit(1)
 
     def filter_df(self, app_map_dict, num_invos):
         df = self.df
