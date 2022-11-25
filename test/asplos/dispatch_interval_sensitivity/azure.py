@@ -6,6 +6,7 @@ import customize_azure
 import json
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib.ticker as ticker
 import os
 
 
@@ -100,21 +101,25 @@ class Azure:
         return filter_df
 
     def plot_RPS(self, df: pd.DataFrame):
+        plt.rc('font', family='Times New Roman', weight='bold', size=10)
         os.system("mkdir -p imgs")
-        timeline = "0.005S"
+        timeline = "S"
         df['invo_ts'] = df['invo_ts'] + pd.to_datetime(self.info['time_line_start'], utc=True)
         df['invo_ts'] = pd.to_datetime(df['invo_ts'])
         values = df.resample(timeline, on='invo_ts').count()['func']
         values = values[values != 0]
-        fig, ax = plt.subplots(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(5, 1.5))
         x_list = values.index
 
         xformatter = mdates.DateFormatter('%H:%M:%S')
-        plt.gcf().axes[0].xaxis.set_major_formatter(xformatter)
+        ax.xaxis.set_major_formatter(xformatter)
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(6))
         # ax.set_xlabel(f"Timeline (Day{day:02d})")
-        ax.set_ylabel("Concurrency")
-        ax.plot(x_list, values, lw=0.5)
-        fig.savefig("imgs/RPS.pdf", bbox_inches='tight')
+        ax.set_ylabel("Concurrency", weight='bold')
+        ax.set_xlabel("Timeline", weight='bold')
+        ax.plot(x_list, values, lw=2)
+        # plt.xticks(fontsize=8)
+        fig.savefig("imgs/benchWorkloadRPS.pdf", bbox_inches='tight')
 
     def filter_df(self, app_map_dict, num_invos):
         df = self.df
