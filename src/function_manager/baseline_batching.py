@@ -73,7 +73,7 @@ class BaseBatching(FunctionGroup):
         logging.info(f"Get {container_retrieved} of containers from the pool")
 
         # 2. Create remaining containers
-        new_containers = self.create_containers_in_parallel(
+        new_containers = self.create_containers_in_blocking(
             num_containers=num_containers - container_retrieved, function=function)
 
         candidate_containers.extend(new_containers)
