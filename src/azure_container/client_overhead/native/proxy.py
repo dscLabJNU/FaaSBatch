@@ -5,6 +5,7 @@ from flask import Flask, request
 from gevent.pywsgi import WSGIServer
 # from main import main as __main__
 import json
+import socket
 import subprocess
 default_file = 'main.py'
 work_dir = '/proxy'
@@ -44,11 +45,28 @@ class Runner:
         return out
 
     def batch_run(self, req, responses):
-        out_bytes = subprocess.check_output(["python3", "main.py"])
+        p = subprocess.Popen(["python3", "main.py"], stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+        activate_SFS = req['azure_data'].get("activate_SFS", False)
+        if activate_SFS:
+            self.send_to_SFS_scheduler(
+                pid=str(p.pid), function_id=req['function_id'])
+
+        out_bytes, _ = p.communicate()
+        # out_bytes = subprocess.check_output(["python3", "main.py"])
         result = out_bytes.decode('utf8').replace("'", '"')
         responses[req["function_id"]] = json.loads(result)
         # responses[req['function_id']] = __main__(req)
         print("INVOKING")
+
+    def send_to_SFS_scheduler(self, pid: str, function_id: str):
+        print(f"Now sending ({pid}, {function_id}) to SFS scheduler")
+        data = {"pid": pid, "id": function_id}
+        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        send_data = json.dumps(data).encode("utf-8")
+        udp_socket.sendto(bytes(send_data), ("172.18.0.1", 4009))
+        udp_socket.close()
+
 
 proxy = Flask(__name__)
 proxy.status = 'new'
