@@ -44,20 +44,22 @@ class Runner:
 
         return out
 
-    def batch_run(self, req, responses):
+    def invoke_function(self, req):
         p = subprocess.Popen(["python3", "main.py"], stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
         activate_SFS = req['azure_data'].get("activate_SFS", False)
         if activate_SFS:
             self.send_to_SFS_scheduler(
                 pid=str(p.pid), function_id=req['function_id'])
+        out_bytes, error = p.communicate()
+        if error:
+            raise subprocess.SubprocessError(error.decode("utf-8"))
 
-        out_bytes, _ = p.communicate()
         # out_bytes = subprocess.check_output(["python3", "main.py"])
         result = out_bytes.decode('utf8').replace("'", '"')
-        responses[req["function_id"]] = json.loads(result)
         # responses[req['function_id']] = __main__(req)
         print("INVOKING")
+        return json.loads(result)
 
     def send_to_SFS_scheduler(self, pid: str, function_id: str):
         print(f"Now sending ({pid}, {function_id}) to SFS scheduler")
@@ -118,16 +120,14 @@ def batch_run():
     responses = {}
     proxy.status = 'run'
     reqs = request.get_json(force=True, silent=True)
-    threads = []
+    start_time = time.time()
     for req in reqs:
         # Identify the concurrency by myself
         req['concurrency'] = len(reqs)
-        t = threading.Thread(target=runner.batch_run,
-                             args=(req, responses))
-        threads.append(t)
-        t.start()
-    for t in threads:
-        t.join()
+        queue_time = (time.time() - start_time) * 1000 # Converts s to ms
+        result = runner.invoke_function(req)
+        result.update({"queue_time": queue_time})
+        responses[req["function_id"]] = result
     proxy.status = 'ok'
     return responses
 
