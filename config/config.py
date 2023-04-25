@@ -46,3 +46,4 @@ and then calculates the 98th latency as the corresponding SLO
 if os.environ.get("strategy") == "Kraken":
     import calculate_SLOs
     FUNCTION_SLOS = calculate_SLOs.func_SLOs
+    SLO_quantail=calculate_SLOs.SLO_quantail

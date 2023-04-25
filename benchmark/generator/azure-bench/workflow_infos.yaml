@@ -3,20 +3,20 @@
   time_line_end: "2021-02-12 22:15:00+00:00"
   workflow_names:
     [
-    # "all"
-      # "azure_bench_app_00000007",
-      # "azure_bench_app_00000003",
-      # "azure_bench_app_00000116",
-      # "azure_bench_app_00000005",
-      "azure_bench_app_00000117",
-      # "azure_bench_app_00000118",
-      # "azure_bench_app_00000115",
-      # "azure_bench_app_00000097",
-      # "azure_bench_app_00000060",
-      # "azure_bench_app_00000012",
-      # "azure_bench_app_00000017",
-      # "azure_bench_app_00000067",
-      # "azure_bench_app_00000004",
+      # "all"
+      #  "azure_bench_app_00000007",
+      #  "azure_bench_app_00000003",
+       "azure_bench_app_00000116",
+      #  "azure_bench_app_00000005",
+       "azure_bench_app_00000117",
+      #  "azure_bench_app_00000118",
+      #  "azure_bench_app_00000115",
+      #  "azure_bench_app_00000097",
+      #  "azure_bench_app_00000060",
+      #  "azure_bench_app_00000012",
+      #  "azure_bench_app_00000017",
+      #  "azure_bench_app_00000067",
+      #  "azure_bench_app_00000004",
     ]
 # BACK UP DATA !!!
 # - azure_trace_day: 4
