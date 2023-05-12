@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"io/ioutil"
 	"strings"
 	"sync"
 
@@ -39,9 +40,26 @@ func parallel_exe(req map[string]interface{}, wg *sync.WaitGroup, responses map[
 
 	// 指定 core 运行 python fib.py str(inpuN)
 	cmd := exec.Command("sudo", schedParams...)
-	out, err := cmd.Output()
+
+	// Create a standar output pipe
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("StdoutPipe error because: ", err)
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal("Command ", schedParams, " start gets error because: ", err)
+	}
+
+	pid := cmd.Process.Pid
+	log.Printf("Process with PID %d started\n", pid)
+
+	// Read result in the ouput pipe
+	out, _ := ioutil.ReadAll(stdout)
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatal("Command ", schedParams, " wait gets error because: ", err)
 	}
 
 	var fibResult FibResult
