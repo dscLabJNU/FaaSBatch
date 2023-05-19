@@ -12,19 +12,20 @@ from utils import SamplingMode
 
 
 class AzureBlob:
-    def __init__(self, workflow_info, azure_type='IO') -> None:
+    def __init__(self, workflow_info, azure_type) -> None:
         self.info = workflow_info
         self.azure_type = azure_type
         self.df = self.load_df(day=self.info['azure_trace_day'])
 
     def load_df(self, day):
         print("Loading Azure dataset...")
+        # TODO delete the nrow limit
         df = pd.read_csv(
-            f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionBlobAccessTrace/azurefunctions-accesses-2020-day{day:02d}.csv", nrows=00)
+            f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionBlobAccessTrace/azurefunctions-accesses-2020-day{day:02d}.csv", nrows=2000)
         df['Datetime'] = pd.to_datetime(
             df['Datetime'], format='%Y-%m-%d %H:%M:%S.%f')
         df['invo_ts'] = df['Datetime'] - df['Datetime'].min()
-        print(df['invo_ts'])
+        # print(df['invo_ts'])
         return df
 
     def load_mappers(self):
@@ -75,8 +76,6 @@ class AzureBlob:
         filter_df = df[(df['invo_ts'] >= start) &
                        (df['invo_ts'] <= end)].copy()
 
-        print(filter_df)
-
         # Picks top $(num_invos) of the filter_df for benchmarking
         if num_invos:
             if mode == SamplingMode.Sequantial:
@@ -85,5 +84,4 @@ class AzureBlob:
                 filter_df = filter_df.sample(n=num_invos, random_state=5432)
         print(
             f"We have {filter_df['AnonAppName'].nunique()} of unique apps, {filter_df['AnonBlobName'].nunique()} of unique blobs, and {filter_df['invo_ts'].count()} of invocations")
-        return filter_df
-        return self.assign_input_values(filter_df)
+        return filter_df.reset_index().drop('index', axis=1)

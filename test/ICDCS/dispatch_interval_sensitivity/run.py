@@ -92,32 +92,53 @@ def analyze(mode, results_dir, azure_type=None):
             azure = AzureFunction(workflow_info, azure_type)
             num_invos = 800
         elif AzureType.IO in azure_type:
+            num_invos = 1000
             # I/O function uses AzureBlob trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureBlob]
             azure = AzureBlob(workflow_info, azure_type)
-            num_invos = 1000
+ 
 
-        df = azure.df
         func_map_dict, app_map_dict = azure.load_mappers()
 
-        filter_df = azure.filter_df(
-            app_map_dict=app_map_dict, 
-            num_invos=num_invos, 
-            mode=SamplingMode.Uniform)
+        eval_trace = azure.filter_df(
+                app_map_dict=app_map_dict, 
+                num_invos=num_invos, 
+                mode=SamplingMode.Uniform
+                )
+
+        if AzureType.IO in azure_type:
+            # I/O function uses AzureBlob trace,
+            # and uses AzureFunction trace to generate function invocation
+            # TODO Optimize this redundancy logic (maybe sometime)
+            azure_function_workflow_info = workflow_infos[AzureTraceSlecter.AzureFunction]
+            azure_function = AzureFunction(azure_function_workflow_info, azure_type=azure_type.replace(AzureType.IO, AzureType.CPU))
+            func_map_dict, app_map_dict = azure_function.load_mappers()
+            azure_function_filtered = azure_function.filter_df(
+                app_map_dict=app_map_dict, 
+                num_invos=num_invos, 
+                mode=SamplingMode.Uniform
+            )
+            if len(azure_function_filtered['func']) < len(eval_trace):
+                raise ValueError(f"Not enough rows can be borrowed from AzureFunction trace, {len(eval_trace)} needed, only {len(azure_function_filtered['func'])} of rows ")
+            
+            print(azure_function_filtered['func'])
+            # Borrow columns from AzureFunction trace
+            eval_trace['func'] = azure_function_filtered['func']
+            eval_trace['duration'] = azure_function_filtered['duration']
+            eval_trace['app'] = azure_function_filtered['app']
+
 
         print("Ploting RPS of the Azure dataset...")
-        azure.plot_RPS(filter_df.copy())
-        exit()
+        azure.plot_RPS(eval_trace.copy())
+
         cnt = 0
         jobs = []
         print("Running Azure dataset...")
-        for i, row in filter_df.iterrows():
+        for _, row in eval_trace.iterrows():
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(
                 func_map_dict, app_map_dict, row, azure_type)
             jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
                         workflow_name=workflow_name, azure_data=azure_data))
-            # jobs.append(gevent.spawn_later(0.01, analyze_azure_workflow,
-            # workflow_name=workflow_name, azure_data=azure_data))
             workflow_pool.append(workflow_name)
             cnt += 1
             if cnt == num_invos:
@@ -139,26 +160,35 @@ def analyze(mode, results_dir, azure_type=None):
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
     invo_ts = row['invo_ts']
     start_ts_sec = invo_ts.total_seconds()  # in seconds
-
-    if AzureType.CPU in azure_type:
-        # CPU function uses AzureFunction trace
-        num_invos = 800
-    elif AzureType.IO in azure_type:
-        # I/O function uses AzureBlob trace
-        num_invos = 1000
-
-
     duration = row['duration']
     function_name = func_map_dict[row["func"]]
     workflow_name = app_map_dict[row['app']]
-    input_n = int(row.get("input_n", 30))
     azure_data = {
         "function_name": function_name,
-        "duration": duration,
-        "input_n": input_n,
     }
-    # print(f"input_n of {function_name} is {input_n}")
-    # print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
+    if AzureType.CPU in azure_type:
+        # CPU function uses AzureFunction trace
+        input_n = int(row.get("input_n", 30))
+        addition_data = {
+            "duration": duration,
+            "input_n": input_n,
+        }
+
+    elif AzureType.IO in azure_type:
+        # I/O function uses AzureBlob trace
+        addition_data = {
+            "aws_boto3": {
+                "aws_access_key_id": f"{row['AnonUserId']}_key_id",
+                "aws_secret_access_key": f"{row['AnonUserId']}_access_key",
+                "region_name": f"{row['AnonRegion']}",
+                "bucket_name": f"{row['AnonBlobName']}{row['AnonBlobETag']}_name",
+                "bucket_key": f"{row['AnonBlobName']}{row['AnonBlobETag']}_key"
+            }
+        }
+
+    azure_data.update(addition_data)
+    
+    print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
     return start_ts_sec, workflow_name, azure_data
 
 
