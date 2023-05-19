@@ -77,14 +77,10 @@ def analyze_workflow(workflow_name, mode):
 
 def analyze(mode, results_dir, azure_type=None):
     global e2e_dict
-    workflow_pool = ['cycles', 'epigenomics', 'genome', 'soykb',
-                     'video', 'illgal_recognizer', 'fileprocessing', 'wordcount']
-    # workflow_pool = ['cycles', 'epigenomics', 'genome', 'soykb']
-    # workflow_pool = ['genome', 'genome', 'genome', 'genome', 'genome']
+    workflow_pool = []
 
     if mode == 'azure_bench':
         seed(5432)
-        workflow_pool.clear()
         workflow_infos = yaml.load(open(
             f"{customize_azure.AZURE_BENCH_ADDR}/workflow_infos.yaml"), Loader=yaml.FullLoader)
         workflow_info = workflow_infos[0]
@@ -118,15 +114,7 @@ def analyze(mode, results_dir, azure_type=None):
 
         print(cnt)
         gevent.joinall(jobs)
-    if mode == 'single':
-        for workflow in workflow_pool:
-            analyze_workflow(workflow, mode)
-    elif mode == 'corun':
-        jobs = []
-        for i, workflow_name in enumerate(workflow_pool):
-            jobs.append(gevent.spawn_later(
-                i * 5, analyze_workflow, workflow_name, mode))
-        gevent.joinall(jobs)
+   
     print(f"e2e_dict: {e2e_dict}")
     e2e_latencies = []
     for workflow in workflow_pool:
@@ -157,7 +145,7 @@ def prepare_invo_info(func_map_dict, app_map_dict, row):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str, required=True, choices=[
-                        "single", "corun", "azure_bench"], help="Select the benchmark suite")
+                        "azure_bench"], help="Select the benchmark suite")
 
     parser.add_argument("--azure_type", type=str, required='azure_bench' in sys.argv, choices=[
                         "cpu_native", "cpu_optimize", "io_native", "io_optimize"], help="Select the intensive type in which azure_bench mode")

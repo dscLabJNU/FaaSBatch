@@ -21,8 +21,8 @@ function runStrategy() {
     ./run.sh Kraken ${azure_type}_native ${dispatch_interval} ${remote_hosts}
     bash fetch_results.sh ${azure_type} ${dispatch_interval} "Kraken" ${remote_hosts[@]}
 
-    ./run.sh Batching ${azure_type}_optimize ${dispatch_interval} ${remote_hosts}
-    bash fetch_results.sh ${azure_type} ${dispatch_interval} "Batching" ${remote_hosts[@]}
+    ./run.sh FaaSBatch ${azure_type}_optimize ${dispatch_interval} ${remote_hosts}
+    bash fetch_results.sh ${azure_type} ${dispatch_interval} "FaaSBatch" ${remote_hosts[@]}
 
     ./run.sh SFS ${azure_type}_native ${dispatch_interval} ${remote_hosts}
     bash fetch_results.sh ${azure_type} ${dispatch_interval} "SFS" ${remote_hosts[@]}

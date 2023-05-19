@@ -100,7 +100,7 @@ function run_monitor() {
 }
 
 function usage() {
-    echo -e "Usage: $0 [Batching, BaseBatching, Kraken, SFS] [cpu, io]"
+    echo -e "Usage: $0 [FaaSBatch, BaseBatching, Kraken, SFS] [cpu, io]"
 }
 
 if [[ $# -lt 2 ]]; then
@@ -125,7 +125,7 @@ else
 
     echo "Now running benchmark..."
     case "$strategy" in
-    "Batching")
+    "FaaSBatch")
         python3 -u run.py --mode azure_bench --azure_type ${azure_type}
         ;;
     "BaseBatching")
