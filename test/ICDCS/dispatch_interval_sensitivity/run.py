@@ -111,7 +111,7 @@ def analyze(mode, results_dir, azure_type=None):
             # and uses AzureFunction trace to generate function invocation
             # TODO Optimize this redundancy logic (maybe sometime)
             azure_function_workflow_info = workflow_infos[AzureTraceSlecter.AzureFunction]
-            azure_function = AzureFunction(azure_function_workflow_info, azure_type=azure_type.replace(AzureType.IO, AzureType.CPU))
+            azure_function = AzureFunction(azure_function_workflow_info, azure_type=azure_type)
             func_map_dict, app_map_dict = azure_function.load_mappers()
             azure_function_filtered = azure_function.filter_df(
                 app_map_dict=app_map_dict, 
@@ -121,7 +121,6 @@ def analyze(mode, results_dir, azure_type=None):
             if len(azure_function_filtered['func']) < len(eval_trace):
                 raise ValueError(f"Not enough rows can be borrowed from AzureFunction trace, {len(eval_trace)} needed, only {len(azure_function_filtered['func'])} of rows ")
             
-            print(azure_function_filtered['func'])
             # Borrow columns from AzureFunction trace
             eval_trace['func'] = azure_function_filtered['func']
             eval_trace['duration'] = azure_function_filtered['duration']
@@ -163,15 +162,15 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
     duration = row['duration']
     function_name = func_map_dict[row["func"]]
     workflow_name = app_map_dict[row['app']]
+    input_n = int(row.get("input_n", 30))
     azure_data = {
         "function_name": function_name,
+            "input_n": input_n,
     }
     if AzureType.CPU in azure_type:
         # CPU function uses AzureFunction trace
-        input_n = int(row.get("input_n", 30))
         addition_data = {
             "duration": duration,
-            "input_n": input_n,
         }
 
     elif AzureType.IO in azure_type:
