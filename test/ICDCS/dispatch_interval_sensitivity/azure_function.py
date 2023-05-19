@@ -8,9 +8,11 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as ticker
 import os
+from utils import SamplingMode
 
 
-class Azure:
+
+class AzureFunction:
     def __init__(self, workflow_info, azure_type) -> None:
         self.info = workflow_info
         self.azure_type = azure_type
@@ -96,7 +98,7 @@ class Azure:
         filter_df["input_n"] = pd.Series(input_values)
         filter_df["input_n"].fillna(30, inplace=True)
 
-        # Turn it on if you wants to check the distribution of input_values
+        # Turn it on if you want to check the distribution of input_values
         # self.validate_input_values(filter_df)
         return filter_df
 
@@ -104,7 +106,8 @@ class Azure:
         plt.rc('font', family='Times New Roman', weight='bold', size=10)
         os.system("mkdir -p imgs")
         timeline = "S"
-        df['invo_ts'] = df['invo_ts'] + pd.to_datetime(self.info['time_line_start'], utc=True)
+        df['invo_ts'] = df['invo_ts'] + \
+            pd.to_datetime(self.info['time_line_start'], utc=True)
         df['invo_ts'] = pd.to_datetime(df['invo_ts'])
         values = df.resample(timeline, on='invo_ts').count()['func']
         values = values[values != 0]
@@ -119,9 +122,15 @@ class Azure:
         ax.set_xlabel("Timeline", weight='bold')
         ax.plot(x_list, values, lw=2)
         # plt.xticks(fontsize=8)
-        fig.savefig("imgs/benchWorkloadRPS.pdf", bbox_inches='tight')
+        fig.savefig("imgs/AzureFunctionWorkloadRPS.pdf", bbox_inches='tight')
 
-    def filter_df(self, app_map_dict, num_invos):
+    def filter_df(self, app_map_dict, num_invos=None, mode=SamplingMode.Sequantial):
+        """
+        mode:
+            sequential (default): Starting from the lowest index, select ${num_invos} elements in order.
+            uniform: Perform uniform random sampling of ${num_invos} elements from the sequence.
+        """
+
         df = self.df
         azure_apps = self.info['workflow_names']
         start = self.info['time_line_start']
@@ -149,7 +158,10 @@ class Azure:
 
         # Picks top $(num_invos) of the filter_df for benchmarking
         if num_invos:
-            filter_df = filter_df[:num_invos]
+            if mode == SamplingMode.Sequantial:
+                filter_df = filter_df[:num_invos]
+            elif mode == SamplingMode.Uniform:
+                filter_df = filter_df.sample(n=num_invos, random_state=5432)
         print(
             f"We have {filter_df['app'].nunique()} of unique apps, {filter_df['func'].nunique()} of unique functions, and {filter_df['invo_ts'].count()} of invocations")
         return self.assign_input_values(filter_df)

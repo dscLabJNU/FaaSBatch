@@ -13,7 +13,9 @@ import time
 import gevent
 import yaml
 import customize_azure
-from azure import Azure
+from azure_function import AzureFunction
+from azure_blob import AzureBlob
+from utils import AzureTraceSlecter, AzureType, SamplingMode
 import argparse
 import os
 
@@ -83,30 +85,39 @@ def analyze(mode, results_dir, azure_type=None):
         seed(5432)
         workflow_infos = yaml.load(open(
             f"{customize_azure.AZURE_BENCH_ADDR}/workflow_infos.yaml"), Loader=yaml.FullLoader)
-        workflow_info = workflow_infos[0]
-        azure = Azure(workflow_info, azure_type)
+        
+        if AzureType.CPU in azure_type:
+            # CPU function uses AzureFunction trace
+            workflow_info = workflow_infos[AzureTraceSlecter.AzureFunction]
+            azure = AzureFunction(workflow_info, azure_type)
+            num_invos = 800
+        elif AzureType.IO in azure_type:
+            # I/O function uses AzureBlob trace
+            workflow_info = workflow_infos[AzureTraceSlecter.AzureBlob]
+            azure = AzureBlob(workflow_info, azure_type)
+            num_invos = 1000
 
         df = azure.df
         func_map_dict, app_map_dict = azure.load_mappers()
 
-        if "cpu" in azure_type:
-            num_invos = 800
-        elif "io" in azure_type:
-            num_invos = 400
-        filter_df = azure.filter_df(app_map_dict, num_invos)
+        filter_df = azure.filter_df(
+            app_map_dict=app_map_dict, 
+            num_invos=num_invos, 
+            mode=SamplingMode.Uniform)
+
         print("Ploting RPS of the Azure dataset...")
         azure.plot_RPS(filter_df.copy())
-
+        exit()
         cnt = 0
         jobs = []
         print("Running Azure dataset...")
         for i, row in filter_df.iterrows():
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(
-                func_map_dict, app_map_dict, row)
+                func_map_dict, app_map_dict, row, azure_type)
             jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
                         workflow_name=workflow_name, azure_data=azure_data))
             # jobs.append(gevent.spawn_later(0.01, analyze_azure_workflow,
-                        # workflow_name=workflow_name, azure_data=azure_data))
+            # workflow_name=workflow_name, azure_data=azure_data))
             workflow_pool.append(workflow_name)
             cnt += 1
             if cnt == num_invos:
@@ -114,7 +125,7 @@ def analyze(mode, results_dir, azure_type=None):
 
         print(cnt)
         gevent.joinall(jobs)
-   
+
     print(f"e2e_dict: {e2e_dict}")
     e2e_latencies = []
     for workflow in workflow_pool:
@@ -125,9 +136,18 @@ def analyze(mode, results_dir, azure_type=None):
     df.to_csv(csv_name, index=False)
 
 
-def prepare_invo_info(func_map_dict, app_map_dict, row):
+def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
     invo_ts = row['invo_ts']
     start_ts_sec = invo_ts.total_seconds()  # in seconds
+
+    if AzureType.CPU in azure_type:
+        # CPU function uses AzureFunction trace
+        num_invos = 800
+    elif AzureType.IO in azure_type:
+        # I/O function uses AzureBlob trace
+        num_invos = 1000
+
+
     duration = row['duration']
     function_name = func_map_dict[row["func"]]
     workflow_name = app_map_dict[row['app']]

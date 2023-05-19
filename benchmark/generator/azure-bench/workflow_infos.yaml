@@ -1,34 +1,11 @@
+# For AzureFunction Trace
 - azure_trace_day: 13
   time_line_start: "2021-02-12 22:10:00+00:00"
-  time_line_end: "2021-02-12 22:15:00+00:00"
-  workflow_names:
-    [
-      # "all"
-      #  "azure_bench_app_00000007",
-      #  "azure_bench_app_00000003",
-      #  "azure_bench_app_00000116",
-      #  "azure_bench_app_00000005",
-       "azure_bench_app_00000117",
-      #  "azure_bench_app_00000118",
-      #  "azure_bench_app_00000115",
-      #  "azure_bench_app_00000097",
-      #  "azure_bench_app_00000060",
-      #  "azure_bench_app_00000012",
-      #  "azure_bench_app_00000017",
-      #  "azure_bench_app_00000067",
-      #  "azure_bench_app_00000004",
-    ]
-# BACK UP DATA !!!
-# - azure_trace_day: 4
-#   time_line_start: "2021-02-03 19:55:00+00:00"
-#   time_line_end: "2021-02-03 20:00:00+00:00"
-#   workflow_names:
-#     [
-#       "azure_bench_app_00000021",
-#       "azure_bench_app_00000034",
-#       "azure_bench_app_00000037",
-#       "azure_bench_app_00000055",
-#       "azure_bench_app_00000060",
-#       "azure_bench_app_00000068",
-#       "azure_bench_app_00000073",
-#     ]
+  time_line_end: "2021-02-12 23:15:00+00:00"
+  workflow_names: ["azure_bench_app_00000117"]
+
+# For AzureBlob Trace
+- azure_trace_day: 1
+  time_line_start: "2020-11-23 00:00:00.031"
+  time_line_end: "2020-11-23 01:00:00.031"
+  workflow_names: ["azure_bench_app_00000117"]
