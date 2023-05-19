@@ -37,7 +37,7 @@ DATA_MODE = 'raw' # raw, optimized
 CONTROL_MODE = 'WorkerSP' # WorkerSP, MasterSP
 CLEAR_DB_AND_MEM = True
 REQUEST_BATCHING = os.environ.get("request_batching", "True") == 'True'
-STRATEGY = os.environ.get("strategy", "Batching") # Batching, Fifer, Kraken
+STRATEGY = os.environ.get("strategy", "FaaSBatch") # BaseBatching, FaaSBatch, SFS, Kraken
 AZURE_DATA_DIR='/home/vagrant/data/Azure'
 DISPATCH_INTERVAL=float(os.environ.get("dispatch_interval", 0.2))
 """We first evaluates benchmark functions in baseline stragety (spawn a single container to serve each incoming request)

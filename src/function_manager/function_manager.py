@@ -3,7 +3,7 @@ import docker
 import os
 from function_info import parse
 from function_group import FunctionGroup
-from my_batching import Batching
+from faas_batch import FaaSBatch
 from kraken import Kraken
 from sfs import SFS
 from baseline_batching import BaseBatching
