@@ -28,15 +28,16 @@ def get_s3_instance(args):
     time_s3_create = time.time() - start
     return s3, bucket_name, bucket_key, time_s3_create * 1000
 
+
 def main(args=None):
     if not args:
         concurrency = globals()['concurrency']
     else:
         concurrency = args['concurrency']
     # log_file = open(f"./logs/s3_resource.csv", 'a')
-    
+
     mem_before = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-    _, _, _, exec_time = get_s3_instance({})
+    _, _, _, exec_time = get_s3_instance(args=args.get("aws_boto3", {}))
     mem_after = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
     mem_used = mem_after - mem_before
     # print(f"{time_s3_create},{mem},{concurrency}", file=log_file, flush=True)
@@ -46,3 +47,7 @@ def main(args=None):
     #     "mem_used": mem_used,
     # }
     return {"exec_time": exec_time, "mem_used": mem_used, "concurrency": concurrency}
+
+
+if __name__ == "__main__":
+    print(main({"concurrency": 2}))
