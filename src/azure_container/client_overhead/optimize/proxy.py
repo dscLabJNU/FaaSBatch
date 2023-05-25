@@ -1,11 +1,21 @@
 import os
 import threading
+from threading import Lock
+import const
 import time
 from flask import Flask, request
 from gevent.pywsgi import WSGIServer
 from main import main as __main__
 import aspectlib
 import boto3
+from local_cache import LocalCache
+from eviction_strategy import LFU
+import logging
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 
 default_file = 'main.py'
 work_dir = '/proxy'
@@ -20,17 +30,17 @@ class Runner:
         self.ctx = {}
 
     def init(self):
-        print('init...')
+        logger.info('init...')
 
         os.chdir(work_dir)
 
         # compile first
         filename = os.path.join(work_dir, default_file)
-        print(f"filename={filename}")
+        logger.info(f"filename={filename}")
         with open(filename, 'r') as f:
             self.code = compile(f.read(), filename, mode='exec')
 
-        print('init finished...')
+        logger.info('init finished...')
 
     def run(self, args):
         self.ctx = args
@@ -45,44 +55,44 @@ class Runner:
         return out
 
     def batch_run(self, req, responses):
-        # self.ctx = req
-        # pre-exec
-        # exec(self.code, self.ctx)
-        
         # run function
         with aspectlib.weave(boto3.Session, open_hook):
             responses[req['function_id']] = __main__(req)
-            # responses[req['request_id']] = eval('main()', self.ctx)
-        print("INVOKING")
-        # return {"request_id": req['request_id'], "out": __main__(req)}
 
 
 proxy = Flask(__name__)
 proxy.status = 'new'
 proxy.debug = False
 runner = Runner()
+result_cache = {}
+# For caching the instance in container
+result_cache = LocalCache(LFU())
+# Storing the key set of 'None' output
+unavialble_key = []
 
-result_dict = {}
+
 @aspectlib.Aspect
 def open_hook(*args, **kwargs):
     """
         The hash value of all input parameters as KEY,
         and the output of the monitored function as VALUE.
-        The {KEY: VALUE} relationship is maintained by `result_dict`
+        The {KEY: VALUE} relationship is maintained by `result_cache`
     """
-    # yield aspectlib.Return(s3)
     combind_inputs = (args, tuple(sorted(kwargs.items())))
     hash_args = hash(str(combind_inputs))
-    print(f"hash_args: {hash_args}")
-    if hash_args in result_dict:
-        print(f'cached result is {result_dict[hash_args]}')
-        yield aspectlib.Return(result_dict[hash_args])
+    if hash_args not in unavialble_key:
+        result = result_cache.get(hash_args)
+        if result is not LocalCache.notFound:
+            yield aspectlib.Return(result)
 
+    # Normal exeuction
     result = yield aspectlib.Proceed
 
-    result_dict[hash_args] = result
-    print(f"the result is: {result}")
-    print(f"type of the result: {type(result)}")
+    if result:
+        result_cache.set(hash_args, {r'result': result,
+                                     r'expire': LocalCache.nowTime() + const.DEFAULT_CACHE_LEASE})
+    else:
+        unavialble_key.append(hash_args)
     yield aspectlib.Return(result)
 
 
@@ -127,7 +137,7 @@ def run():
 
 @proxy.route('/batch_run', methods=['POST'])
 def batch_run():
-    
+
     responses = {}
     proxy.status = 'run'
     reqs = request.get_json(force=True, silent=True)
@@ -139,7 +149,6 @@ def batch_run():
     # trigger socket client cache
     first_req = reqs.pop(0)
     runner.batch_run(first_req, responses)
-    
     for req in reqs:
         t = threading.Thread(target=runner.batch_run,
                              args=(req, responses))
