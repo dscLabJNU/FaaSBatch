@@ -9,21 +9,15 @@ RUN sed -i "s@http://deb.debian.org@https://mirrors.ustc.edu.cn/@g" /etc/apt/sou
 RUN mkdir /proxy
 
 # copy libs
-COPY proxy.py /proxy/proxy.py
-COPY main.py /proxy/main.py
+COPY *.py /proxy/
+COPY requirements.txt /proxy/requirements.txt
 WORKDIR /proxy
 
 # proxy server runs under port 5000
 EXPOSE 5000
 
-# for alpine base only
-# RUN apk update && \
-#     apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev make && \
-#     pip install --no-cache-dir gevent flask && \
-#     apk del .build-deps
-
 RUN apt-get clean
 RUN apt-get update
-RUN pip3 install --no-cache-dir gevent flask aspectlib boto3 psutil
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 CMD [ "python3", "/proxy/proxy.py" ]
