@@ -18,14 +18,10 @@ class AzureBlob:
         self.df = self.load_df(day=self.info['azure_trace_day'])
 
     def load_df(self, day):
-        print("Loading Azure dataset...")
+        print("Loading Azure Blob dataset...")
         # TODO delete the nrow limit
         df = pd.read_csv(
-            f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionBlobAccessTrace/azurefunctions-accesses-2020-day{day:02d}.csv", nrows=2000)
-        df['Datetime'] = pd.to_datetime(
-            df['Datetime'], format='%Y-%m-%d %H:%M:%S.%f')
-        df['invo_ts'] = df['Datetime'] - df['Datetime'].min()
-        # print(df['invo_ts'])
+            f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionBlobAccessTrace/azurefunctions-accesses-2020-day{day:02d}.csv", nrows=20000)
         return df
 
     def load_mappers(self):
@@ -67,15 +63,19 @@ class AzureBlob:
         """
 
         df = self.df
-        start = pd.Timestamp(
-            self.info['time_line_start']) - df['Datetime'].min()
-        end = pd.Timestamp(self.info['time_line_end']) - df['Datetime'].min()
+        start = self.info['time_line_start']
+        end = self.info['time_line_end']
 
         # 筛选出指定的 time-line
         print(f"Filtering data from {start} to {end}")
-        filter_df = df[(df['invo_ts'] >= start) &
-                       (df['invo_ts'] <= end)].copy()
+        filter_df = df[(df['Datetime'] >= start) &
+                       (df['Datetime'] <= end)].copy()
 
+        # 调整invo_ts的偏移量，从0开始
+        filter_df['invo_ts'] = pd.to_datetime(
+            filter_df['Datetime']) - pd.to_datetime(start)
+
+        num_invos = min(num_invos, len(filter_df))
         # Picks top $(num_invos) of the filter_df for benchmarking
         if num_invos:
             if mode == SamplingMode.Sequantial:

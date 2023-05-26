@@ -19,7 +19,7 @@ class AzureFunction:
         self.df = self.load_df(day=self.info['azure_trace_day'])
 
     def load_df(self, day):
-        print("Loading Azure dataset...")
+        print("Loading Azure Function dataset...")
         df = pd.read_csv(
             f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionsInvocationTraceForTwoWeeksJan2021Day{day:02d}.csv")
         df['start_timestamp'] = df['end_timestamp'] - df['duration']
@@ -156,6 +156,7 @@ class AzureFunction:
         filter_df['invo_ts'] = filter_df['invo_ts'] - \
             pd.to_datetime(start, utc=True)
 
+        num_invos = min(num_invos, len(filter_df))
         # Picks top $(num_invos) of the filter_df for benchmarking
         if num_invos:
             if mode == SamplingMode.Sequantial:
