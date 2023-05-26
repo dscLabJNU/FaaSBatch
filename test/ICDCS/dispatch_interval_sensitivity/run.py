@@ -92,7 +92,7 @@ def analyze(mode, results_dir, azure_type=None):
             azure = AzureFunction(workflow_info, azure_type)
             num_invos = 800
         elif AzureType.IO in azure_type:
-            num_invos = 1000
+            num_invos = 10000
             # I/O function uses AzureBlob trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureBlob]
             azure = AzureBlob(workflow_info, azure_type)
@@ -103,8 +103,11 @@ def analyze(mode, results_dir, azure_type=None):
         eval_trace = azure.filter_df(
                 app_map_dict=app_map_dict, 
                 num_invos=num_invos, 
-                mode=SamplingMode.Uniform
+                mode=SamplingMode.Sequantial
                 )
+
+        print("Ploting RPS of the Azure dataset...")
+        azure.plot_RPS(eval_trace.copy())
 
         if AzureType.IO in azure_type:
             # I/O function uses AzureBlob trace,
@@ -127,15 +130,14 @@ def analyze(mode, results_dir, azure_type=None):
             eval_trace['app'] = azure_function_filtered['app']
 
 
-        print("Ploting RPS of the Azure dataset...")
-        azure.plot_RPS(eval_trace.copy())
-
         cnt = 0
         jobs = []
+        trace_time = 0
         print("Running Azure dataset...")
         for _, row in eval_trace.iterrows():
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(
                 func_map_dict, app_map_dict, row, azure_type)
+            trace_time = max(start_ts_sec, trace_time)
             jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
                         workflow_name=workflow_name, azure_data=azure_data))
             workflow_pool.append(workflow_name)
@@ -144,6 +146,7 @@ def analyze(mode, results_dir, azure_type=None):
                 break
 
         print(cnt)
+        print(f"This experiment will be done in {trace_time/60} mins")
         gevent.joinall(jobs)
 
     print(f"e2e_dict: {e2e_dict}")
@@ -181,13 +184,14 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
                 "aws_secret_access_key": f"{row['AnonUserId']}_access_key",
                 "region_name": f"{row['AnonRegion']}",
                 "bucket_name": f"{row['AnonBlobName']}{row['AnonBlobETag']}_name",
-                "bucket_key": f"{row['AnonBlobName']}{row['AnonBlobETag']}_key"
+                "bucket_key": f"{row['AnonBlobName']}{row['AnonBlobETag']}_key",
+                "read": row['Read']
             }
         }
 
     azure_data.update(addition_data)
     
-    print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
+    # print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
     return start_ts_sec, workflow_name, azure_data
 
 
