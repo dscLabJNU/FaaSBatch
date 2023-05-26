@@ -81,6 +81,7 @@ def open_hook(*args, **kwargs):
     combind_inputs = (args, tuple(sorted(kwargs.items())))
     hash_args = hash(str(combind_inputs))
     if hash_args not in unavialble_key:
+        # There are some None input to generate None ouput
         result = result_cache.get(hash_args)
         if result is not LocalCache.notFound:
             yield aspectlib.Return(result)
