@@ -51,8 +51,6 @@ class FaaSBatch(FunctionGroup):
         # 1. 先从container pool中获取尽量多可用的容器
         while len(self.container_pool) and container_created < num_containers:
             container = self.self_container(function=function)
-            # Update core-affinity list
-            # core_manager.schedule_cores(container, concurrency)
             candidate_containers.append(container)
             container_created += 1
 
@@ -64,10 +62,7 @@ class FaaSBatch(FunctionGroup):
                 container = self.create_container(function=function)
                 cold_start = (time.time() - start) * 1000  # Coverts s to ms
                 self.time_cold.append(cold_start)
-                # container = self.fake_create_container(function=function)
 
-            # Update core-affinity list
-            # core_manager.schedule_cores(container, concurrency)
             candidate_containers.append(container)
             container_created += 1
             logging.info(
@@ -88,9 +83,7 @@ class FaaSBatch(FunctionGroup):
             return
 
         function = local_rq[0].function
-        # print(f"{function.info.function_name},{len(local_rq)}",
-        #   file=FaaSBatch.function_load_log, flush=True)
-        # return
+
         # Create or get containers
         candidate_containers = self.dynamic_reactive_scaling(
             function=function, local_rq=local_rq)
