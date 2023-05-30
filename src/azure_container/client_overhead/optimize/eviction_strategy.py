@@ -1,5 +1,6 @@
 import const
 import logging
+import random
 logger = logging.getLogger(__name__)
 
 
@@ -15,16 +16,36 @@ class EvictionStrategy:
     def should_evict(self, cache):
         return len(cache.pool) >= self.maxlen
 
+    def update(self, key, cache):
+        pass
+
     def evict(self, cache):
         raise NotImplementedError
 
 
-class DequeEvictionStrategy(EvictionStrategy):
+class Random(EvictionStrategy):
     def __init__(self, maxlen=None):
         super().__init__(maxlen)
 
     def evict(self, cache):
-        logger.info(f"Evicting cache {cache}")
+        random_key = random.choice(list(cache.pool.keys()))
+        del cache.pool[random_key]
+        logger.info(f"Evicting random cache item with key: [{random_key}]")
+
+
+class LRU(EvictionStrategy):
+    def __init__(self, maxlen=None):
+        super().__init__(maxlen)
+
+    def update(self, key, cache):
+        """
+        Remove existing key and reinsert it to update it as the most recently used.
+        """
+        value = cache.pool.pop(key)
+        cache.pool[key] = value
+
+    def evict(self, cache):
+        logger.info(f"Evicting LRU cache [{cache}]")
         cache.pool.popitem(last=False)
 
 
@@ -46,7 +67,7 @@ class LFU(EvictionStrategy):
         # 找出优先级最低的键
         min_priority_key = min(self.priority, key=self.priority.get)
 
-        logger.info(f"Evicting cache with key: [{min_priority_key}]")
+        logger.info(f"Evicting LFU cache with key: [{min_priority_key}]")
         del cache.pool[min_priority_key]
         del cache.hits[min_priority_key]
         del self.priority[min_priority_key]

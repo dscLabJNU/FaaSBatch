@@ -1,6 +1,5 @@
 import os
 import threading
-from threading import Lock
 import const
 import time
 from flask import Flask, request
@@ -9,7 +8,7 @@ from main import main as __main__
 import aspectlib
 import boto3
 from local_cache import LocalCache
-from eviction_strategy import LFU
+import eviction_strategy
 import logging
 
 logging.basicConfig(level=logging.INFO,
@@ -66,7 +65,7 @@ proxy.debug = False
 runner = Runner()
 result_cache = {}
 # For caching the instance in container
-result_cache = LocalCache(LFU())
+result_cache = LocalCache(eviction_strategy.LRU())
 # Storing the key set of 'None' output
 unavialble_key = []
 
@@ -95,6 +94,15 @@ def open_hook(*args, **kwargs):
     else:
         unavialble_key.append(hash_args)
     yield aspectlib.Return(result)
+
+
+@proxy.route('/hit_rate', methods=['GET'])
+def get_hit_rate():
+    """
+    Search and return the cache hit rate
+    """
+    hit_rate = result_cache.get_hit_rate()
+    return {"hit_rate": hit_rate}
 
 
 @proxy.route('/status', methods=['GET'])
