@@ -65,8 +65,6 @@ proxy.debug = False
 runner = Runner()
 # Storing the key set of 'None' output
 unavialble_key = []
-# For caching the instance in container
-result_cache = {}
 
 
 @aspectlib.Aspect
