@@ -85,12 +85,14 @@ def open_hook(*args, **kwargs):
         if result is not LocalCache.notFound:
             yield aspectlib.Return(result)
 
+    start = time.time()
     # Normal exeuction
     result = yield aspectlib.Proceed
+    duration = time.time() - start
 
     if result:
         result_cache.set(hash_args, {r'result': result,
-                                     r'expire': LocalCache.nowTime() + const.DEFAULT_CACHE_LEASE})
+                                     r'creation_time': duration})
     else:
         unavialble_key.append(hash_args)
     yield aspectlib.Return(result)

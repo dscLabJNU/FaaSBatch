@@ -13,26 +13,24 @@ class LocalCache():
             eviction_strategy = LRU()
         self.pool = collections.OrderedDict()
         self.hits = collections.Counter()
-        self.num_invos = 0
+        self.frequency = collections.Counter()
         self.eviction_strategy = eviction_strategy
 
     def get_hit_rate(self):
         try:
             total_hits = sum(self.hits.values())
-            return total_hits / self.num_invos
+            total_invos = sum(self.frequency.values())
+            logger.info(f"Getting hit rate... [{total_hits}/{total_invos}]")
+            return total_hits / total_invos
         except ZeroDivisionError:
             logger.error("Error: No requests received yet, division by zero, ")
             return 0
-
-    @staticmethod
-    def nowTime():
-        return int(time.time())
 
     def update(self, key):
         self.eviction_strategy.update(key=key, cache=self)
 
     def get(self, key):
-        self.num_invos += 1
+        self.frequency[key] += 1
         value = self.pool.get(key, self.notFound)
         if value is not self.notFound:
             logger.info(f"key [{key}] hit! [{value}]")
