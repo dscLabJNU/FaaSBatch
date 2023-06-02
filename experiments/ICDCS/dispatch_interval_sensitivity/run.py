@@ -85,7 +85,7 @@ def analyze(mode, results_dir, azure_type=None):
         seed(5432)
         workflow_infos = yaml.load(open(
             f"{customize_azure.AZURE_BENCH_ADDR}/workflow_infos.yaml"), Loader=yaml.FullLoader)
-        
+
         if AzureType.CPU in azure_type:
             # CPU function uses AzureFunction trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureFunction]
@@ -96,15 +96,14 @@ def analyze(mode, results_dir, azure_type=None):
             # I/O function uses AzureBlob trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureBlob]
             azure = AzureBlob(workflow_info, azure_type)
- 
 
         func_map_dict, app_map_dict = azure.load_mappers()
 
         eval_trace = azure.filter_df(
-                app_map_dict=app_map_dict, 
-                num_invos=num_invos, 
-                mode=SamplingMode.Sequantial
-                )
+            app_map_dict=app_map_dict,
+            num_invos=num_invos,
+            mode=SamplingMode.Sequantial
+        )
 
         print("Ploting RPS of the Azure dataset...")
         azure.plot_RPS(eval_trace.copy())
@@ -114,21 +113,22 @@ def analyze(mode, results_dir, azure_type=None):
             # and uses AzureFunction trace to generate function invocation
             # TODO Optimize this redundancy logic (maybe sometime)
             azure_function_workflow_info = workflow_infos[AzureTraceSlecter.AzureFunction]
-            azure_function = AzureFunction(azure_function_workflow_info, azure_type=azure_type)
+            azure_function = AzureFunction(
+                azure_function_workflow_info, azure_type=azure_type)
             func_map_dict, app_map_dict = azure_function.load_mappers()
             azure_function_filtered = azure_function.filter_df(
-                app_map_dict=app_map_dict, 
-                num_invos=num_invos, 
+                app_map_dict=app_map_dict,
+                num_invos=num_invos,
                 mode=SamplingMode.Sequantial
             )
             if len(azure_function_filtered['func']) < len(eval_trace):
-                raise ValueError(f"Not enough rows can be borrowed from AzureFunction trace, {len(eval_trace)} needed, only {len(azure_function_filtered['func'])} of rows ")
-            
+                raise ValueError(
+                    f"Not enough rows can be borrowed from AzureFunction trace, {len(eval_trace)} needed, only {len(azure_function_filtered['func'])} of rows ")
+
             # Borrow columns from AzureFunction trace
             eval_trace['func'] = azure_function_filtered['func']
             eval_trace['duration'] = azure_function_filtered['duration']
             eval_trace['app'] = azure_function_filtered['app']
-
 
         cnt = 0
         jobs = []
@@ -168,7 +168,7 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
     input_n = int(row.get("input_n", 30))
     azure_data = {
         "function_name": function_name,
-            "input_n": input_n,
+        "input_n": input_n,
     }
     if AzureType.CPU in azure_type:
         # CPU function uses AzureFunction trace
@@ -190,7 +190,7 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
         }
 
     azure_data.update(addition_data)
-    
+
     # print(f"Trigger {workflow_name}, {function_name} in {start_ts_sec} seconds")
     return start_ts_sec, workflow_name, azure_data
 
