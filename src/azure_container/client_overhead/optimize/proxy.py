@@ -65,6 +65,7 @@ proxy.debug = False
 runner = Runner()
 # Storing the key set of 'None' output
 unavialble_key = []
+cached_keys = set()
 
 
 @aspectlib.Aspect
@@ -88,6 +89,7 @@ def open_hook(*args, **kwargs):
     duration = time.time() - start
 
     if result:
+        cached_keys.add(hash_args)
         result_cache.set(hash_args, {r'result': result,
                                      r'creation_time': duration})
     else:
@@ -189,7 +191,13 @@ def batch_run():
     for t in threads:
         t.join()
     proxy.status = 'ok'
+    logger.debug(f"{len(cached_keys)} of keys are cached")
     return responses
+
+@proxy.route('/num_of_cache_keys', methods=['GET'])
+def get_num_of_cache_keys():
+    return {"num_of_cache_keys": len(cached_keys)}
+
 
 
 if __name__ == '__main__':
