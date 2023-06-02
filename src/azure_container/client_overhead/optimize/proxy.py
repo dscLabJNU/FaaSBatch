@@ -1,6 +1,6 @@
 import os
 import threading
-import const
+import importlib
 import time
 from flask import Flask, request
 from gevent.pywsgi import WSGIServer
@@ -63,11 +63,10 @@ proxy = Flask(__name__)
 proxy.status = 'new'
 proxy.debug = False
 runner = Runner()
-result_cache = {}
-# For caching the instance in container
-result_cache = LocalCache(eviction_strategy.LRU())
 # Storing the key set of 'None' output
 unavialble_key = []
+# For caching the instance in container
+result_cache = {}
 
 
 @aspectlib.Aspect
@@ -127,6 +126,30 @@ def init():
     return ('OK', 200)
 
 
+def set_cache_strategy(cache_strategy):
+    global result_cache
+
+    cur_cache_strategy = os.environ.get("cache_strategy")
+    if cache_strategy == cur_cache_strategy:
+        # No need to reset
+        return
+    os.environ["cache_strategy"] = cache_strategy
+    logger.info(f"Setting cache strategy to {cache_strategy}")
+    # Dynamically import the module
+    module = importlib.import_module('eviction_strategy')
+    # Get the reference to the class from the module
+    class_ref = getattr(module, cache_strategy)
+    result_cache = LocalCache(class_ref())
+
+
+@proxy.route('/set_strategy', methods=['POST'])
+def set_strategy():
+    args = request.get_json(force=True, silent=True)
+    cache_strategy = args.get("cache_strategy", "LRU")
+    set_cache_strategy(cache_strategy=cache_strategy)
+    return ('OK', 200)
+
+
 @proxy.route('/run', methods=['POST'])
 def run():
     proxy.status = 'run'
@@ -173,4 +196,5 @@ def batch_run():
 
 if __name__ == '__main__':
     server = WSGIServer(('0.0.0.0', 5000), proxy)
+    set_cache_strategy(cache_strategy="LRU")
     server.serve_forever()
