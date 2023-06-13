@@ -46,6 +46,7 @@ if [[ ${strategy} == "SFS" ]]; then
     cd -
 fi
 echo "launching proxy..."
+mkdir tmp -p
 python3 proxy.py $ip 8000
 kill_SFS
 fi
