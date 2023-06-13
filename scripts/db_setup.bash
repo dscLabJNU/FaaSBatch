@@ -15,6 +15,7 @@ apt-get install wondershaper
 # install and initialize couchdb
 docker pull couchdb
 docker run -itd -p 5984:5984 -e COUCHDB_USER=openwhisk -e COUCHDB_PASSWORD=openwhisk --name couchdb couchdb
+apt-get install python3-pip -y
 pip3 install -r requirements.txt
 python3 couchdb_starter.py
 # install redis
