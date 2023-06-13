@@ -23,4 +23,4 @@ docker pull redis
 docker run -itd -p 6379:6379 --name redis redis
 # run grouping for all benchmarks
 cd ../src/grouping
-python3 grouping.py video illgal_recognizer fileprocessing wordcount cycles epigenomics genome soykb
+python3 grouping.py azure_bench_all
