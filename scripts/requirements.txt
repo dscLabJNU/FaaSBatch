@@ -6,3 +6,4 @@ flask
 psutil
 pandas
 PyYAML
+matplotlib
