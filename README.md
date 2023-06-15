@@ -16,6 +16,7 @@ FaaSBatch is developed based on the [FaaSFlow](https://github.com/lzjzx1122/FaaS
     worker IP: 10.0.0.101
     client IP: 10.0.0.103
    ```
+3. Python version: 3.9, creating a virtual python enviornment by using minoconda/anaconda is recommended
 
 ## About Config Setting
 
