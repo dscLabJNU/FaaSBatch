@@ -4,7 +4,7 @@
 FROM python:3.7-slim
 
 COPY pip.conf /etc/pip.conf
-RUN sed -i "s@http://deb.debian.org@https://mirrors.ustc.edu.cn/@g" /etc/apt/sources.list && rm -Rf /var/lib/apt/lists/* && apt-get update
+# RUN sed -i "s@http://deb.debian.org@https://mirrors.ustc.edu.cn/@g" /etc/apt/sources.list && rm -Rf /var/lib/apt/lists/* && apt-get update
 # fulfill the structure requirement of proxy
 RUN mkdir /proxy
 
@@ -22,8 +22,8 @@ EXPOSE 5000
 #     pip install --no-cache-dir gevent flask && \
 #     apk del .build-deps
 
-RUN apt-get clean
-RUN apt-get update
+# RUN apt-get clean
+# RUN apt-get update
 RUN pip3 install --no-cache-dir gevent flask aspectlib boto3 psutil
 
 CMD [ "python3", "/proxy/proxy.py" ]

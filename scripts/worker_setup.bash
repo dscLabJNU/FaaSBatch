@@ -1,7 +1,7 @@
 # install docker
-apt-get update
-apt-get install python3-pip -y
-apt-get install -y \
+sudo apt-get update
+sudo apt-get install python3-pip -y
+sudo apt-get install -y \
     ca-certificates \
     curl \
     gnupg \
@@ -10,15 +10,15 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o 
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
   $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io
-# install python packages
-pip3 install -r requirements.txt
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+
+sudo chown "$USER":"$USER" /home/"$USER"/.docker -R
+sudo chmod g+rwx "/home/$USER/.docker" -R
+
 # install redis
 docker pull redis
 docker run -itd -p 6379:6379 --name redis redis
-# build docker images
-docker build --no-cache -t workflow_base ../src/container
 cd ../benchmark/generator/azure-bench
 python3 generate_trace.py
 python3 build_images.py
