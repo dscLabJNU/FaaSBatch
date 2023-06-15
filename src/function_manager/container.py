@@ -102,6 +102,17 @@ class Container:
         self.lasttime = time.time()
         return r.status_code == 200
 
+    def set_cache_strategy(self, cache_strategy):
+        """
+        A cache scheduling strategy that manages the socket client instances inside container
+        Only for evaluating the efficiency of io_optimize function.
+        """
+        if not cache_strategy:
+            return
+        data = {"cache_strategy": cache_strategy}
+        r = requests.post(base_url.format(self.port, 'set_strategy'), json=data)
+        return r.status_code == 200
+
     # kill and remove the container
     def destroy(self):
         self.container.remove(force=True)

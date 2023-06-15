@@ -54,12 +54,13 @@ class FaaSBatch(FunctionGroup):
             candidate_containers.append(container)
             container_created += 1
 
+        request_data = local_rq[0].data # it contains the cache_strategy (request_data['cache_strategy'])
         # 2. 创建剩下所需的容器
         while container_created < num_containers:
             container = None
             while not container:
                 start = time.time()
-                container = self.create_container(function=function)
+                container = self.create_container(function=function, extra_data=request_data)
                 cold_start = (time.time() - start) * 1000  # Coverts s to ms
                 self.time_cold.append(cold_start)
 

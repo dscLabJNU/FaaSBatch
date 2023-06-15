@@ -166,23 +166,10 @@ class FunctionGroup():
             t.join()
         return containers_parallel
 
-    def create_container(self, function, bind_cpus=None):
+    def create_container(self, function, bind_cpus=None, extra_data=None):
         """Creating a new container
         """
-        # do not create new exec container
-        # when the number of execs hits the limit
-        """ 暂时忽略scale limit
-        """
-        # self.b.acquire()  # critical: missing lock may cause infinite container creation under high concurrency scenario
-        # if self.num_exec + len(self.container_pool) > function.info.max_containers:
-        # logging.info('hit container limit, function: %s',
-        #  function.info.function_name)
-        # return None
-        # self.num_exec += 1
-        # self.b.release()
-
         try:
-            # self.b.acquire()
             logging.info(
                 f'create container of function: {function.info.function_name}',)
             container = Container.create(
@@ -193,7 +180,10 @@ class FunctionGroup():
             self.num_exec -= 1
             return None
         self.init_container(container, function)
-        # self.b.release()
+        if extra_data:
+            cache_strategy = extra_data['azure_data'].get("cache_strategy", None)
+            print(f"cache_strategy: {cache_strategy}")
+            container.set_cache_strategy(cache_strategy=cache_strategy)
 
         return container
 
