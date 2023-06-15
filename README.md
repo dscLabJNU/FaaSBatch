@@ -34,7 +34,9 @@ Clone our code `https://github.com/GitHubDiom/batching-request.git` and:
 
 4. Then, apply all the modification into each node.
 
-5. On the storage node: Run `bash scripts/db_setup.bash`. It installs docker, CouchDB, some python packages, and build grouping results from the Azure benchmark. For the remaining dev, one can restart the cluster by running `bash scripts/db_restart.bash`.
+5. To make sure the python dependencies are well installed, run `pip3 install -r requirements.txt` in `~/batching-request/scripts`.
+
+6. On the storage node: Run `bash scripts/db_setup.bash`. It installs docker, CouchDB, some python packages, and build grouping results from the Azure benchmark. For the remaining dev, one can restart the cluster by running `bash scripts/db_restart.bash`.
     
 
 
