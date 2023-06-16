@@ -2,6 +2,7 @@ import logging
 import time
 import uuid
 import threading
+import requests
 
 from gevent import event
 from gevent.lock import BoundedSemaphore
@@ -55,15 +56,14 @@ class FunctionGroup():
         # container pool
         # the number of containers in execution, not in container pool
         self.num_exec = 0
-        # self.num_exec = {
-        # function.info.function_name: 0 for function in functions}
+        FunctionGroup.hit_rate_log = None
 
         # 创建完毕并执行完请求的容器，用于接收后续请求
         self.container_pool = []
 
         self.b = BoundedSemaphore()
 
-    def init_logs(self, invocation_log, function_load_log):
+    def init_logs(self, invocation_log, function_load_log, hit_rate_log=None):
         """
             schedule_time:  The time from receiving the request to sending the request to the container,
                 including cold start and time overhead of the strategy
@@ -74,6 +74,9 @@ class FunctionGroup():
         print(f"function,container_name,schedule_time(ms),cold_start(ms),exec_time(ms),queue_time(ms),used_memory(MB),input_n",
               file=invocation_log, flush=True)
         print("function,load", file=function_load_log, flush=True)
+        FunctionGroup.hit_rate_log = hit_rate_log
+        print(f"Container,hits,invos,hit_rate,num_of_cache_keys",
+              file=self.hit_rate_log, flush=True)
 
     # put the request into request queue
     def send_request(self, function, request_id, runtime, input, output, to, keys, azure_data=None):
@@ -181,7 +184,8 @@ class FunctionGroup():
             return None
         self.init_container(container, function)
         if extra_data:
-            cache_strategy = extra_data['azure_data'].get("cache_strategy", None)
+            cache_strategy = extra_data['azure_data'].get(
+                "cache_strategy", None)
             print(f"cache_strategy: {cache_strategy}")
             container.set_cache_strategy(cache_strategy=cache_strategy)
 
@@ -206,6 +210,8 @@ class FunctionGroup():
     def remove_container(self, container):
         print(
             f'remove container group: {self.name}, pool size: {len(self.container_pool)}',)
+        # record hit_rate for candidate containers
+        self.record_hit_rate(container=container)
         container.destroy()
         self.port_controller.put(container.port)
 
@@ -242,8 +248,25 @@ class FunctionGroup():
         if req.defer:
             self.defer_times.append(req.defer)
 
+    def record_hit_rate(self, container):
+        port = container.port
+        base_url = 'http://127.0.0.1:{}/{}'
+        try:
+            cache_info = requests.get(base_url.format(
+                port, 'cache_info')).json()
+            num_of_cached_keys = requests.get(base_url.format(
+                port, 'num_of_cache_keys')).json()['num_of_cache_keys']
+            print(f"{container.container.name},{cache_info['hits']},{cache_info['invos']},{cache_info['hit_rate']},{num_of_cached_keys}",
+                file=self.hit_rate_log, flush=True)
+        except Exception as e:
+            """
+            Only io_optimize container image
+            can invoke 'hit_rate' and 'num_of_cache_keys' interface
+            """
+            print(f"Something happend: {e}")
+            pass
 
-# life time of three different kinds of containers
+# life time of different kinds of containers
 exec_lifetime = 600
 
 

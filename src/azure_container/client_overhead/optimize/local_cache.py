@@ -16,15 +16,16 @@ class LocalCache():
         self.frequency = collections.Counter()
         self.eviction_strategy = eviction_strategy
 
-    def get_hit_rate(self):
+    def cache_info(self):
         try:
             total_hits = sum(self.hits.values())
             total_invos = sum(self.frequency.values())
             logger.info(f"Getting hit rate... [{total_hits}/{total_invos}]")
-            return total_hits / total_invos
+            hit_rate = total_hits / total_invos
+            return {"hits": total_hits, "invos": total_invos, "hit_rate": hit_rate}
         except ZeroDivisionError:
             logger.error("Error: No requests received yet, division by zero, ")
-            return 0
+            return {"hits": 0, "invos": 0, "hit_rate": 0}
 
     def update(self, key):
         self.eviction_strategy.update(key=key, cache=self)

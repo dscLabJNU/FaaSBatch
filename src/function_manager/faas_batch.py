@@ -22,8 +22,11 @@ class FaaSBatch(FunctionGroup):
                 "./tmp/latency_amplification_FaaSBatch.csv", 'w')
             FaaSBatch.function_load_log = open(
                 "./tmp/function_load_FaaSBatch.csv", "w")
+            FaaSBatch.hit_rate_log = open(
+                "./tmp/hit_rate_FaaSBatch.csv", "w")
             self.init_logs(invocation_log=FaaSBatch.log_file,
-                           function_load_log=FaaSBatch.function_load_log)
+                           function_load_log=FaaSBatch.function_load_log,
+                           hit_rate_log=FaaSBatch.hit_rate_log)
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         res = super().send_request(function, request_id,
@@ -54,13 +57,15 @@ class FaaSBatch(FunctionGroup):
             candidate_containers.append(container)
             container_created += 1
 
-        request_data = local_rq[0].data # it contains the cache_strategy (request_data['cache_strategy'])
+        # it contains the cache_strategy (request_data['cache_strategy'])
+        request_data = local_rq[0].data
         # 2. 创建剩下所需的容器
         while container_created < num_containers:
             container = None
             while not container:
                 start = time.time()
-                container = self.create_container(function=function, extra_data=request_data)
+                container = self.create_container(
+                    function=function, extra_data=request_data)
                 cold_start = (time.time() - start) * 1000  # Coverts s to ms
                 self.time_cold.append(cold_start)
 

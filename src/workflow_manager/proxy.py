@@ -7,11 +7,11 @@ from typing import Dict
 import sys
 sys.path.append('../../config')
 import config
-import customize_azure
 from workersp import WorkerSPManager
 from mastersp import MasterSPManager
 import docker
 from flask import Flask, request
+import requests
 app = Flask(__name__)
 docker_client = docker.from_env()
 container_names = []
@@ -91,6 +91,20 @@ def clear():
     dispatcher.clear_mem(workflow_name, request_id)
     # and remove state for every node
     dispatcher.del_state(workflow_name, request_id, master)
+    return json.dumps({'status': 'ok'})
+
+
+@app.route('/finalize_hit_rate', methods=['POST'])
+def finalize_hit_rate():
+    containers = docker_client.containers.list(filters={"label": "workflow"})
+    log_file = open("./tmp/hit_rate_FaaSBatch.csv", "a")
+    for c in containers:
+        ip_add = c.attrs['NetworkSettings']['IPAddress']
+        base_url = 'http://'+ip_add+':{}/{}'
+        cache_info = requests.get(base_url.format(5000, 'cache_info')).json()
+        num_of_cached_keys = requests.get(base_url.format(5000, 'num_of_cache_keys')).json()['num_of_cache_keys']
+        print(f"{c.name},{cache_info['hits']},{cache_info['invos']},{cache_info['hit_rate']},{num_of_cached_keys}",
+                file=log_file, flush=True)
     return json.dumps({'status': 'ok'})
 
 

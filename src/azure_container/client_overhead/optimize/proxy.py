@@ -97,13 +97,12 @@ def open_hook(*args, **kwargs):
     yield aspectlib.Return(result)
 
 
-@proxy.route('/hit_rate', methods=['GET'])
-def get_hit_rate():
+@proxy.route('/cache_info', methods=['GET'])
+def cache_info():
     """
-    Search and return the cache hit rate
+    Search and return the cache information (hits, invos, and hit rate)
     """
-    hit_rate = result_cache.get_hit_rate()
-    return {"hit_rate": hit_rate}
+    return result_cache.cache_info()
 
 
 @proxy.route('/status', methods=['GET'])
