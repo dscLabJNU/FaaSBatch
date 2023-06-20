@@ -38,9 +38,9 @@ Clone our code `https://github.com/GitHubDiom/batching-request.git` and:
 
 6. On the storage node: Run `bash scripts/db_setup.bash`. It installs docker, CouchDB, some python packages, and build grouping results from the Azure benchmark. For the remaining dev, one can restart the cluster by running `bash scripts/db_restart.bash`.
     
+7. On worker node: Run `bash scripts/worker_setup.bash`. This installs docker, Redis, some python packages, and build docker images from the Azure benchmark. Similarly, `bash scripts/worker_restart.sh` restarts the worker, it regenerates Azure trace, rebuilds the container images.
 
-
-6. On worker node: Run `bash scripts/worker_setup.bash`. This installs docker, Redis, some python packages, and build docker images from the Azure benchmark. Similarly, `bash scripts/worker_restart.sh` restarts the worker, it regenerates Azure trace, rebuilds the container images.
+8. Ensure SSH login communication (without password) is possible between the machines used for the experiment
 
 
 ## Run Experiment
