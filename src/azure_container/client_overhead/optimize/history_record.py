@@ -4,8 +4,7 @@ import const
 
 class HistoryRecord():
     """
-    Data structure for request execute delay.
-    Only stores the latency in last #self.update_interval seconds!!!
+    Data structure for request inter-arrival time
     """
 
     def __init__(self) -> None:
