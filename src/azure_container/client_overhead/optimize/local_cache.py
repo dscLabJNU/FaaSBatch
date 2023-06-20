@@ -1,4 +1,5 @@
 import time
+from history_record import HistoryRecord
 import collections
 from eviction_strategy import LRU
 import logging
@@ -16,6 +17,9 @@ class LocalCache():
         self.frequency = collections.Counter()
         self.eviction_strategy = eviction_strategy
 
+        # IaT of each request
+        self.req_iat = collections.defaultdict(lambda : HistoryRecord())
+
     def cache_info(self):
         try:
             total_hits = sum(self.hits.values())
@@ -31,6 +35,12 @@ class LocalCache():
         self.eviction_strategy.update(key=key, cache=self)
 
     def get(self, key):
+        # Request arrived
+        now_time = time.time()
+        self.req_iat[key].append(now_time)
+        # logger.info(f"key: {key} => IaT: {list(self.req_iat[key].values)}")
+        # logger.info(f"iat 95 tail: {self.req_iat[key].get_percentail(percent=95)}")
+
         self.frequency[key] += 1
         value = self.pool.get(key, self.notFound)
         if value is not self.notFound:

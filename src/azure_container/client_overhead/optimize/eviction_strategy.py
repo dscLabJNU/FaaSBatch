@@ -3,6 +3,7 @@ import logging
 import random
 from collections import defaultdict
 import sys
+import time
 logger = logging.getLogger(__name__)
 
 
@@ -123,3 +124,35 @@ class LFU(EvictionStrategy):
         del cache.pool[min_priority_key]
         del cache.hits[min_priority_key]
         del self.priority[min_priority_key]
+
+
+class MyCache(EvictionStrategy):
+    def __init__(self, maxlen=None):
+        super().__init__(maxlen)
+        self.keys_to_evict = []
+
+    def should_evict(self, cache):
+        """
+        Check if any keys in the cache should be evicted based on their idle time
+        """
+        for key, iat_sequence in cache.req_iat.items():
+            # iat_sequence.get_last() -> timestamp the last request arrived
+            idle_time = time.time() - iat_sequence.get_last()
+            logger.info(f"Key [{key}] has been idle for {idle_time} seconds")
+
+            if idle_time > iat_sequence.get_percentail(
+                    percent=const.DEFAULT_IDEAL_PERCENTAIL) * 3:
+                logger.info(f"Adding key [{key}] to eviction list...")
+                self.keys_to_evict.append(key)
+
+        return len(self.keys_to_evict)
+
+    def evict(self, cache):
+        for evict_key in self.keys_to_evict:
+            logger.info(f"Evicting MyCache cache with key: [{evict_key}]")
+            if evict_key in cache.pool:
+                del cache.pool[evict_key]
+            if evict_key in cache.hits:
+                del cache.hits[evict_key]
+            if evict_key in cache.req_iat:
+                del cache.req_iat[evict_key]
