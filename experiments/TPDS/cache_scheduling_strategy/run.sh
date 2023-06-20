@@ -100,7 +100,7 @@ function run_monitor() {
 }
 
 function usage() {
-    echo -e "Usage: $0 [FaaSBatch, BaseBatching, Kraken, SFS] [cpu, io]"
+    echo -e "Usage: $0 [FaaSBatch] [cpu, io]"
 }
 
 if [[ $# -lt 2 ]]; then
@@ -109,7 +109,8 @@ else
     strategy=$1
     azure_type=$2
     dispatch_interval=$3
-    remote_hosts=${@:4}
+    cache_strategy=$4
+    remote_hosts=${@:5}
 
     clean_monitor $remote_hosts
     clean_proxy_gateway $remote_hosts
@@ -126,20 +127,8 @@ else
     echo "Now running benchmark..."
     case "$strategy" in
     "FaaSBatch")
-        python3 -u run.py --mode azure_bench --azure_type ${azure_type}
-        ;;
-    "BaseBatching")
-        python3 -u run.py --mode azure_bench --azure_type ${azure_type}
-        ;;
-    "SFS")
-        python3 -u run.py --mode azure_bench --azure_type ${azure_type}
-        ;;
-    "Kraken")
-        python3 -u run.py --mode azure_bench --azure_type ${azure_type}
-        ;;
-    *)
-        usage
-        ;;
+        python3 -u run.py --mode azure_bench --azure_type ${azure_type} --cache_strategy ${cache_strategy}
+    ;;
     esac
     clean_monitor $remote_hosts
 fi

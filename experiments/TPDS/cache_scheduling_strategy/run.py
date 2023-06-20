@@ -62,7 +62,7 @@ def analyze(mode, results_dir, cache_strategy, azure_type=None):
             azure = AzureFunction(workflow_info, azure_type)
             num_invos = 800
         elif AzureType.IO in azure_type:
-            num_invos = 10000
+            num_invos = 20000
             # I/O function uses AzureBlob trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureBlob]
             azure = AzureBlob(workflow_info, azure_type)
@@ -72,7 +72,7 @@ def analyze(mode, results_dir, cache_strategy, azure_type=None):
         eval_trace = azure.filter_df(
             app_map_dict=app_map_dict,
             num_invos=num_invos,
-            mode=SamplingMode.Sequantial
+            mode=SamplingMode.Uniform
         )
 
         print("Ploting RPS of the Azure dataset...")
@@ -89,7 +89,7 @@ def analyze(mode, results_dir, cache_strategy, azure_type=None):
             azure_function_filtered = azure_function.filter_df(
                 app_map_dict=app_map_dict,
                 num_invos=num_invos,
-                mode=SamplingMode.Sequantial
+                mode=SamplingMode.Uniform
             )
             if len(azure_function_filtered['func']) < len(eval_trace):
                 raise ValueError(
@@ -108,26 +108,24 @@ def analyze(mode, results_dir, cache_strategy, azure_type=None):
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(
                 func_map_dict, app_map_dict, row, azure_type, cache_strategy)
             trace_time = max(start_ts_sec, trace_time)
-    #         jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
-    #                     workflow_name=workflow_name, azure_data=azure_data))
-    #         workflow_pool.append(workflow_name)
-    #         cnt += 1
-    #         if cnt == num_invos:
-    #             break
+            jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
+                        workflow_name=workflow_name, azure_data=azure_data))
+            workflow_pool.append(workflow_name)
+            cnt += 1
+            if cnt == num_invos:
+                break
 
-    #     print(cnt)
-    #     print(f"This experiment will be done in {trace_time/60} mins")
-    #     gevent.joinall(jobs)
-
-    # print(f"e2e_dict: {e2e_dict}")
-    # e2e_latencies = []
-    # for workflow in workflow_pool:
-    #     e2e_latencies.append(e2e_dict[workflow])
-    # df = pd.DataFrame({'workflow': workflow_pool,
-    #                   'e2e_latency': e2e_latencies})
-    # csv_name = f"{results_dir}/{mode}_{azure_type if mode == 'azure_bench' else 'normal'}.csv"
-    # df.to_csv(csv_name, index=False)
-
+        print(cnt)
+        print(f"This experiment will be done in {trace_time/60} mins")
+        gevent.joinall(jobs)
+    
+    """
+    Container lifetime is set on function_group.py
+    The hit rate is automatically recorded for containers that reach the lifetime, 
+    but for containers that end the experiment but do not reach the lifetime, 
+    we actively record the hit ratio so that we can start the next experiment early.
+    """
+    requests.post('http://10.0.0.101:8000/finalize_hit_rate')
 
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type, cache_strategy):
     invo_ts = row['invo_ts']
@@ -176,7 +174,7 @@ def parse_args():
                         help="Select the intensive type in which azure_bench mode")
     
     parser.add_argument("--cache_strategy", type=str, required=True, choices=[
-                        "LRU", "LFU", "GDSF"], help="Select the cache strategy")
+                        "LRU", "LFU", "GDSF", "MyCache"], help="Select the cache strategy")
     return parser.parse_args()
 
 
