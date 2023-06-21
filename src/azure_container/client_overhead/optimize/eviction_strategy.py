@@ -22,7 +22,7 @@ class EvictionStrategy:
     def update(self, key, cache):
         pass
 
-    def evict(self, cache):
+    def evict(self, cache, _):
         raise NotImplementedError
 
 
@@ -30,7 +30,7 @@ class Random(EvictionStrategy):
     def __init__(self, maxlen=None):
         super().__init__(maxlen)
 
-    def evict(self, cache):
+    def evict(self, cache, _):
         random_key = random.choice(list(cache.pool.keys()))
         del cache.pool[random_key]
         logger.info(f"Evicting random cache item with key: [{random_key}]")
@@ -70,7 +70,7 @@ class GDSF(EvictionStrategy):
             logger.info(
                 f"freq: {freq}, clock: {clock}, cost: {cost}, size: {size}, prio: {prio}")
 
-    def evict(self, cache):
+    def evict(self, cache, _):
         self.calculate_priority(cache)
 
         min_priority_key = min(self.priority, key=self.priority.get)
@@ -97,7 +97,7 @@ class LRU(EvictionStrategy):
         value = cache.pool.pop(key)
         cache.pool[key] = value
 
-    def evict(self, cache):
+    def evict(self, cache, _):
         logger.info(f"Evicting LRU cache [{cache}]")
         cache.pool.popitem(last=False)
 
@@ -115,7 +115,7 @@ class LFU(EvictionStrategy):
         for key in cache.pool.keys():
             self.priority[key] = cache.hits[key]
 
-    def evict(self, cache):
+    def evict(self, cache, keys_to_evict):
         self.calculate_priority(cache)
         # 找出优先级最低的键
         min_priority_key = min(self.priority, key=self.priority.get)
@@ -129,12 +129,21 @@ class LFU(EvictionStrategy):
 class MyCache(EvictionStrategy):
     def __init__(self, maxlen=None):
         super().__init__(maxlen)
+        self.minlen = self.maxlen
         self.keys_to_evict = []
 
     def should_evict(self, cache):
         """
         Check if any keys in the cache should be evicted based on their idle time
         """
+        logger.info(f"Cache req_iat: {dict(cache.req_iat)}")
+        keys_to_evict = []
+        num_cache_items = len(cache.pool)
+
+        if num_cache_items <= self.minlen:
+            # Number of cached items are not reach the lower limit yet
+            return keys_to_evict
+
         for key, iat_sequence in cache.req_iat.items():
             # iat_sequence.get_last() -> timestamp the last request arrived
             idle_time = time.time() - iat_sequence.get_last()
@@ -142,17 +151,45 @@ class MyCache(EvictionStrategy):
 
             if idle_time > iat_sequence.get_percentail(
                     percent=const.DEFAULT_IDEAL_PERCENTAIL) * 3:
-                logger.info(f"Adding key [{key}] to eviction list...")
-                self.keys_to_evict.append(key)
+                if key in cache.pool:
+                    """
+                    A key value that exists in ${cache_req_iat} 
+                    does not necessarily also exist in ${cache.pool}
+                    """
+                    logger.info(f"Adding key [{key}] to eviction list...")
+                    # Make sure the number of items in cache pool always >= self.minlen
+                    if num_cache_items - len(keys_to_evict) <= self.minlen:
+                        logger.info(
+                            f"Reach the min len [{self.minlen}] of the cache")
+                        break
+                    keys_to_evict.append(key)
 
-        return len(self.keys_to_evict)
+        return keys_to_evict
 
-    def evict(self, cache):
-        for evict_key in self.keys_to_evict:
+    def evict(self, cache, keys_to_evict):
+        logger.info(
+            f"Ready evicting keys: {keys_to_evict}, number of cache is: {len(cache.pool)}")
+        for i, evict_key in enumerate(keys_to_evict):
+            # Usuing LRU as the eviction strategy
+            k_v_tuple = cache.pool.popitem(last=False)
+            evict_key = k_v_tuple[0]
             logger.info(f"Evicting MyCache cache with key: [{evict_key}]")
-            if evict_key in cache.pool:
-                del cache.pool[evict_key]
             if evict_key in cache.hits:
                 del cache.hits[evict_key]
             if evict_key in cache.req_iat:
                 del cache.req_iat[evict_key]
+
+
+class InfiniteCache(EvictionStrategy):
+    """
+    Cacheing all instances into memory
+    """
+
+    def __init__(self, maxlen=9999999):
+        super().__init__(maxlen)
+
+    def should_evict(self, cache):
+        return False
+
+    def evict(self, cache, keys_to_evict):
+        pass

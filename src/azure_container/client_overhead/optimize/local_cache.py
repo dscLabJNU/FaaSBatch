@@ -57,10 +57,10 @@ class LocalCache():
         if key in self.pool:
             logger.debug("This k-v piar has already existed in cache")
             return
-        if self.eviction_strategy.should_evict(self):
-            logger.info(
-                f"Cache pool is full, limit in {self.eviction_strategy.maxlen}")
-            self.eviction_strategy.evict(self)
+
+        keys_to_evict =  self.eviction_strategy.should_evict(self)
+        if keys_to_evict:
+            self.eviction_strategy.evict(self, keys_to_evict)
 
         logger.info(f"Setting cache with key [{key}] and value [{value}]")
         self.hits[key] += 1  # 更新访问计数器
