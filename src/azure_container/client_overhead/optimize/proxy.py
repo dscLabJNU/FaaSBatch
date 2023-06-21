@@ -8,7 +8,7 @@ from main import main as __main__
 import aspectlib
 import boto3
 from local_cache import LocalCache
-import eviction_strategy
+import const
 import logging
 
 logging.basicConfig(level=logging.INFO,
@@ -125,28 +125,33 @@ def init():
     return ('OK', 200)
 
 
-def set_cache_strategy(cache_strategy):
+def set_cache_strategy(cache_strategy, cache_size=const.DEFAULT_CACHE_MAXLEN):
     global result_cache
 
     cur_cache_strategy = os.environ.get("cache_strategy")
-    if cache_strategy == cur_cache_strategy:
+    cur_cache_size = os.environ.get("cache_size")
+    if cache_strategy == cur_cache_strategy and str(cache_size) == cur_cache_size:
         # No need to reset
         return
     os.environ["cache_strategy"] = cache_strategy
+    os.environ['cache_size'] = str(cache_size)
     logger.info(f"Setting cache strategy to {cache_strategy}")
     # Dynamically import the module
     module = importlib.import_module('eviction_strategy')
     # Get the reference to the class from the module
     class_ref = getattr(module, cache_strategy)
-    result_cache = LocalCache(class_ref())
+    print(f"cache_size: {cache_size}")
+    result_cache = LocalCache(class_ref(maxlen=cache_size))
 
 
 @proxy.route('/set_strategy', methods=['POST'])
 def set_strategy():
     args = request.get_json(force=True, silent=True)
     cache_strategy = args.get("cache_strategy", "LRU")
-    set_cache_strategy(cache_strategy=cache_strategy)
-    return ('OK', 200)
+    cache_size = args.get("cache_size", const.DEFAULT_CACHE_MAXLEN)
+    print(f"cache_size: {cache_size}")
+    set_cache_strategy(cache_strategy=cache_strategy, cache_size=cache_size)
+    return {'OK': 200}
 
 
 @proxy.route('/run', methods=['POST'])
@@ -193,10 +198,10 @@ def batch_run():
     logger.debug(f"{len(cached_keys)} of keys are cached")
     return responses
 
+
 @proxy.route('/num_of_cache_keys', methods=['GET'])
 def get_num_of_cache_keys():
     return {"num_of_cache_keys": len(cached_keys)}
-
 
 
 if __name__ == '__main__':
