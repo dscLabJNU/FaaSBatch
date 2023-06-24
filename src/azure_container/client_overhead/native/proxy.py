@@ -66,7 +66,7 @@ class Runner:
         data = {"pid": pid, "id": function_id}
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         send_data = json.dumps(data).encode("utf-8")
-        udp_socket.sendto(bytes(send_data), ("172.18.0.1", 4009))
+        udp_socket.sendto(bytes(send_data), ("172.17.0.1", 4009))
         udp_socket.close()
 
 
