@@ -75,7 +75,7 @@ class FunctionGroup():
               file=invocation_log, flush=True)
         print("function,load", file=function_load_log, flush=True)
         FunctionGroup.hit_rate_log = hit_rate_log
-        print(f"Container,hits,invos,hit_rate,num_of_cache_keys",
+        print(f"Container,hits,invos,hit_rate,num_of_cache_keys,memory_used(MB)",
               file=self.hit_rate_log, flush=True)
 
     # put the request into request queue
@@ -186,8 +186,9 @@ class FunctionGroup():
         if extra_data:
             cache_strategy = extra_data['azure_data'].get(
                 "cache_strategy", None)
-            print(f"cache_strategy: {cache_strategy}")
-            container.set_cache_strategy(cache_strategy=cache_strategy)
+            cache_size = extra_data['azure_data'].get("cache_size", None)
+            print(f"cache_strategy: {cache_strategy}, size: {cache_size}")
+            container.set_cache_strategy(cache_strategy=cache_strategy, cache_size=cache_size)
 
         return container
 

@@ -3,6 +3,8 @@ from history_record import HistoryRecord
 import collections
 from eviction_strategy import LRU
 import logging
+import psutil
+import os
 logger = logging.getLogger(__name__)
 
 
@@ -16,9 +18,14 @@ class LocalCache():
         self.hits = collections.Counter()
         self.frequency = collections.Counter()
         self.eviction_strategy = eviction_strategy
+        self.init_mem_util = self.get_cur_mem_util()
 
         # IaT of each request
-        self.req_iat = collections.defaultdict(lambda : HistoryRecord())
+        self.req_iat = collections.defaultdict(lambda: HistoryRecord())
+
+    def get_cur_mem_util(self):
+        # in MB
+        return psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024 / 8
 
     def cache_info(self):
         try:
@@ -26,10 +33,12 @@ class LocalCache():
             total_invos = sum(self.frequency.values())
             logger.info(f"Getting hit rate... [{total_hits}/{total_invos}]")
             hit_rate = total_hits / total_invos
-            return {"hits": total_hits, "invos": total_invos, "hit_rate": hit_rate}
+            memory_used = self.get_cur_mem_util() - self.init_mem_util
+            return {"hits": total_hits, "invos": total_invos, 
+                    "hit_rate": hit_rate, "memory_used": memory_used}
         except ZeroDivisionError:
             logger.error("Error: No requests received yet, division by zero, ")
-            return {"hits": 0, "invos": 0, "hit_rate": 0}
+            return {"hits": 0, "invos": 0, "hit_rate": 0, "memory_used": self.init_mem_util}
 
     def update(self, key):
         self.eviction_strategy.update(key=key, cache=self)
@@ -58,7 +67,7 @@ class LocalCache():
             logger.debug("This k-v piar has already existed in cache")
             return
 
-        keys_to_evict =  self.eviction_strategy.should_evict(self)
+        keys_to_evict = self.eviction_strategy.should_evict(self)
         if keys_to_evict:
             self.eviction_strategy.evict(self, keys_to_evict)
 
