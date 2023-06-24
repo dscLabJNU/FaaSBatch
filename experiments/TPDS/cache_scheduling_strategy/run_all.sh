@@ -14,9 +14,10 @@ function runStrategy() {
     azure_type=$1
     dispatch_interval=$2
     cache_strategy=$3
-    remote_hosts=${@:4}
-    ./run.sh FaaSBatch ${azure_type}_optimize ${dispatch_interval} ${cache_strategy} ${remote_hosts}
-    bash fetch_results.sh ${azure_type} ${dispatch_interval} "FaaSBatch" ${cache_strategy} ${remote_hosts[@]}
+    cache_size=$4
+    remote_hosts=${@:5}
+    ./run.sh FaaSBatch ${azure_type}_optimize ${dispatch_interval} ${cache_strategy} ${cache_size} ${remote_hosts}
+    bash fetch_results.sh ${azure_type} ${dispatch_interval} "FaaSBatch" ${cache_strategy} ${cache_size} ${remote_hosts[@]}
 }
 
 function run() {
@@ -24,13 +25,14 @@ function run() {
     remote_hosts=${@:2}
 
     # dispatch_intervals=(0.01 0.05 0.1 0.15 0.2 0.3 0.4 0.5)
-    dispatch_interval=0.2
-    # cache_strategies=("LFU" "MyCache" "GDSF" "LRU")
-    # cache_strategies=("MyCache" "LRU")
-    cache_strategies=("MyCache")
+    dispatch_interval=0.5
+    cache_strategies=("LRU" "LFU" "GDSF" "Random" "InfiniteCache") # "MyCache"）
+    cache_sizes=(2 4 6 8 10 12 14 16 32 64)
 
     for cache_strategy in ${cache_strategies[@]}; do
-        runStrategy ${azure_type} ${dispatch_interval} ${cache_strategy} ${remote_hosts[@]}
+        for cache_size in ${cache_sizes[@]}; do
+            runStrategy ${azure_type} ${dispatch_interval} ${cache_strategy} ${cache_size} ${remote_hosts[@]}
+        done
     done
 }
 if [[ $# -lt 1 ]]; then

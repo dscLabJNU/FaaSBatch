@@ -65,9 +65,10 @@ azure_type=$1
 dispatch_interval=$2
 strategy=$3
 cache_strategy=$4
+cache_size=$5
 case "$azure_type" in
 "cpu" | "io")
-    remote_hosts=${@:5}
+    remote_hosts=${@:6}
     latency_csv_prefix="latency_amplification_%s%s%s.csv"
     utilization_csv_prefix="utilization_%s%s%s.csv"
     hit_rate_csv_prefix="hit_rate_%s%s.csv"
@@ -80,10 +81,10 @@ case "$azure_type" in
     mkdir -p $path_to_save_csvs
 
     for remote_host in ${remote_hosts[@]}; do
-        fetch_csvs $hit_rate_csv_prefix $strategy $azure_type $remote_host $latency_log_path $path_to_save_csvs $cache_strategy
-        fetch_csvs $latency_csv_prefix $strategy $azure_type $remote_host $latency_log_path $path_to_save_csvs $cache_strategy
-        fetch_csvs $utilization_csv_prefix $strategy $azure_type $remote_host $resource_log_path $path_to_save_csvs $cache_strategy
-        fetch_provisioned_containers $remote_host $strategy $cache_strategy $path_to_save_csvs
+        fetch_csvs $hit_rate_csv_prefix $strategy $azure_type $remote_host $latency_log_path $path_to_save_csvs ${cache_strategy}_${cache_size}
+        fetch_csvs $latency_csv_prefix $strategy $azure_type $remote_host $latency_log_path $path_to_save_csvs ${cache_strategy}_${cache_size}
+        fetch_csvs $utilization_csv_prefix $strategy $azure_type $remote_host $resource_log_path $path_to_save_csvs ${cache_strategy}_${cache_size}
+        fetch_provisioned_containers $remote_host $strategy ${cache_strategy}_${cache_size} $path_to_save_csvs
         echo
     done
     ;;

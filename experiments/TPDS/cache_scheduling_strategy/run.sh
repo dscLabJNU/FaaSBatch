@@ -110,7 +110,8 @@ else
     azure_type=$2
     dispatch_interval=$3
     cache_strategy=$4
-    remote_hosts=${@:5}
+    cache_size=$5
+    remote_hosts=${@:6}
 
     clean_monitor $remote_hosts
     clean_proxy_gateway $remote_hosts
@@ -127,7 +128,7 @@ else
     echo "Now running benchmark..."
     case "$strategy" in
     "FaaSBatch")
-        python3 -u run.py --mode azure_bench --azure_type ${azure_type} --cache_strategy ${cache_strategy}
+        python3 -u run.py --mode azure_bench --azure_type ${azure_type} --cache_strategy ${cache_strategy} --cache_size ${cache_size}
     ;;
     esac
     clean_monitor $remote_hosts

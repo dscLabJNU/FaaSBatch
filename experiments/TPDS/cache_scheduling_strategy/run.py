@@ -47,7 +47,7 @@ def analyze_azure_workflow(workflow_name, azure_data):
     e2e_dict[workflow_name] = e2e_latency
 
 
-def analyze(mode, results_dir, cache_strategy, azure_type=None):
+def analyze(mode, results_dir, cache_data, azure_type=None):
     global e2e_dict
     workflow_pool = []
 
@@ -62,7 +62,7 @@ def analyze(mode, results_dir, cache_strategy, azure_type=None):
             azure = AzureFunction(workflow_info, azure_type)
             num_invos = 800
         elif AzureType.IO in azure_type:
-            num_invos = 20000
+            num_invos = 10000
             # I/O function uses AzureBlob trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureBlob]
             azure = AzureBlob(workflow_info, azure_type)
@@ -72,7 +72,7 @@ def analyze(mode, results_dir, cache_strategy, azure_type=None):
         eval_trace = azure.filter_df(
             app_map_dict=app_map_dict,
             num_invos=num_invos,
-            mode=SamplingMode.Uniform
+            mode=SamplingMode.Sequantial
         )
 
         print("Ploting RPS of the Azure dataset...")
@@ -106,7 +106,7 @@ def analyze(mode, results_dir, cache_strategy, azure_type=None):
         print("Running Azure dataset...")
         for _, row in eval_trace.iterrows():
             start_ts_sec, workflow_name, azure_data = prepare_invo_info(
-                func_map_dict, app_map_dict, row, azure_type, cache_strategy)
+                func_map_dict, app_map_dict, row, azure_type, cache_data)
             trace_time = max(start_ts_sec, trace_time)
             jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
                         workflow_name=workflow_name, azure_data=azure_data))
@@ -127,7 +127,7 @@ def analyze(mode, results_dir, cache_strategy, azure_type=None):
     """
     requests.post('http://10.0.0.101:8000/finalize_hit_rate')
 
-def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type, cache_strategy):
+def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type, cache_data):
     invo_ts = row['invo_ts']
     start_ts_sec = invo_ts.total_seconds()  # in seconds
     duration = row['duration']
@@ -147,7 +147,8 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type, cache_strate
     elif AzureType.IO in azure_type:
         # I/O function uses AzureBlob trace
         addition_data = {
-            "cache_strategy": cache_strategy,
+            "cache_strategy": cache_data['cache_strategy'],
+            "cache_size": cache_data['cache_size'],
             "aws_boto3": {
                 "aws_access_key_id": f"{row['AnonUserId']}_key_id",
                 "aws_secret_access_key": f"{row['AnonUserId']}_access_key",
@@ -174,7 +175,8 @@ def parse_args():
                         help="Select the intensive type in which azure_bench mode")
     
     parser.add_argument("--cache_strategy", type=str, required=True, choices=[
-                        "LRU", "LFU", "GDSF", "MyCache"], help="Select the cache strategy")
+                        "LRU", "LFU", "GDSF", "MyCache", "Random", "InfiniteCache"], help="Select the cache strategy")
+    parser.add_argument("--cache_size", type=int, required=False, help="Indicate the cache size")
     return parser.parse_args()
 
 
@@ -184,4 +186,13 @@ if __name__ == '__main__':
     args = parse_args()
     repo.clear_couchdb_results()
     repo.clear_couchdb_workflow_latency()
-    analyze(args.mode, results_dir, args.cache_strategy, args.azure_type)
+    
+    # Scheduling the cache items inside containers
+    cache_data = {
+        "cache_strategy": args.cache_strategy,
+        # If ${args.cache_size} is None, the cache size is set
+        # as the default value (see DEFAULT_CACHE_MAXLEN in src/azure_container/client_overhead/optimize/const.py)
+        "cache_size": args.cache_size
+    }
+    print(cache_data)
+    analyze(args.mode, results_dir, cache_data, args.azure_type)

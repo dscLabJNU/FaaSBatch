@@ -33,7 +33,7 @@ function clean_monitor() {
 
     execRemoteCMD "dev-01" "${ps_command}" "${exec_command}"
     # execRemoteCMD "dev-02" "${ps_command}" "${exec_command}"
-    execRemoteCMD "dev-04" "${ps_command}" "${exec_command}"
+    # execRemoteCMD "dev-04" "${ps_command}" "${exec_command}"
 }
 
 clean_monitor
