@@ -24,7 +24,7 @@ type FibResult struct {
 
 func sendToSFSScheduler(pid int, functionId string) {
 	socket, err := net.DialUDP("udp", nil, &net.UDPAddr{
-		IP:   net.IPv4(172, 18, 0, 1),
+		IP:   net.IPv4(172, 17, 0, 1),
 		Port: 4009,
 	})
 	if err != nil {
