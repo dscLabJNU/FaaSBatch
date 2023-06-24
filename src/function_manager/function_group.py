@@ -186,8 +186,9 @@ class FunctionGroup():
         if extra_data:
             cache_strategy = extra_data['azure_data'].get(
                 "cache_strategy", None)
-            print(f"cache_strategy: {cache_strategy}")
-            container.set_cache_strategy(cache_strategy=cache_strategy)
+            cache_size = extra_data['azure_data'].get("cache_size", None)
+            print(f"cache_strategy: {cache_strategy}, size: {cache_size}")
+            container.set_cache_strategy(cache_strategy=cache_strategy, cache_size=cache_size)
 
         return container
 

@@ -16,6 +16,7 @@ app = Flask(__name__)
 docker_client = docker.from_env()
 container_names = []
 
+
 class Dispatcher:
     def __init__(self, data_mode: str, control_mode: str, info_addrs: Dict[str, str]) -> None:
         self.managers = {}
@@ -102,9 +103,10 @@ def finalize_hit_rate():
         ip_add = c.attrs['NetworkSettings']['IPAddress']
         base_url = 'http://'+ip_add+':{}/{}'
         cache_info = requests.get(base_url.format(5000, 'cache_info')).json()
-        num_of_cached_keys = requests.get(base_url.format(5000, 'num_of_cache_keys')).json()['num_of_cache_keys']
-        print(f"{c.name},{cache_info['hits']},{cache_info['invos']},{cache_info['hit_rate']},{num_of_cached_keys}",
-                file=log_file, flush=True)
+        num_of_cached_keys = requests.get(base_url.format(
+            5000, 'num_of_cache_keys')).json()['num_of_cache_keys']
+        print(f"{c.name},{cache_info['hits']},{cache_info['invos']},{cache_info['hit_rate']},{num_of_cached_keys},{cache_info['memory_used']}",
+              file=log_file, flush=True)
     return json.dumps({'status': 'ok'})
 
 
@@ -132,7 +134,8 @@ def get_container_names():
 
 def print_strategy_info():
     if config.REQUEST_BATCHING:
-        print(f"Running proxy with strategy = {config.STRATEGY}, dispatch_interval = {config.DISPATCH_INTERVAL}")
+        print(
+            f"Running proxy with strategy = {config.STRATEGY}, dispatch_interval = {config.DISPATCH_INTERVAL}")
         if config.STRATEGY == "Kraken":
             print(f"SLO_quantail={config.SLO_quantail}")
     else:

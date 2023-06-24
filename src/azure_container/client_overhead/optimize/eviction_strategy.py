@@ -22,7 +22,7 @@ class EvictionStrategy:
     def update(self, key, cache):
         pass
 
-    def evict(self, cache, _):
+    def evict(self, cache, keys_to_evict):
         raise NotImplementedError
 
 
@@ -30,7 +30,7 @@ class Random(EvictionStrategy):
     def __init__(self, maxlen=None):
         super().__init__(maxlen)
 
-    def evict(self, cache, _):
+    def evict(self, cache, keys_to_evict):
         random_key = random.choice(list(cache.pool.keys()))
         del cache.pool[random_key]
         logger.info(f"Evicting random cache item with key: [{random_key}]")
@@ -70,7 +70,7 @@ class GDSF(EvictionStrategy):
             logger.info(
                 f"freq: {freq}, clock: {clock}, cost: {cost}, size: {size}, prio: {prio}")
 
-    def evict(self, cache, _):
+    def evict(self, cache, keys_to_evict):
         self.calculate_priority(cache)
 
         min_priority_key = min(self.priority, key=self.priority.get)
@@ -97,7 +97,7 @@ class LRU(EvictionStrategy):
         value = cache.pool.pop(key)
         cache.pool[key] = value
 
-    def evict(self, cache, _):
+    def evict(self, cache, keys_to_evict):
         logger.info(f"Evicting LRU cache [{cache}]")
         cache.pool.popitem(last=False)
 
