@@ -1,7 +1,7 @@
 import time
 from history_record import HistoryRecord
 import collections
-from eviction_strategy import LRU
+from eviction_strategy import InfiniteCache
 import logging
 import psutil
 import os
@@ -13,7 +13,7 @@ class LocalCache():
 
     def __init__(self, eviction_strategy=None):
         if eviction_strategy is None:
-            eviction_strategy = LRU()
+            eviction_strategy = InfiniteCache()
         self.pool = collections.OrderedDict()
         self.hits = collections.Counter()
         self.frequency = collections.Counter()

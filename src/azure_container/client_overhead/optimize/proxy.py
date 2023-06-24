@@ -147,7 +147,7 @@ def set_cache_strategy(cache_strategy, cache_size=const.DEFAULT_CACHE_MAXLEN):
 @proxy.route('/set_strategy', methods=['POST'])
 def set_strategy():
     args = request.get_json(force=True, silent=True)
-    cache_strategy = args.get("cache_strategy", "LRU")
+    cache_strategy = args.get("cache_strategy", "InfiniteCache")
     cache_size = args.get("cache_size", const.DEFAULT_CACHE_MAXLEN)
     print(f"cache_size: {cache_size}")
     set_cache_strategy(cache_strategy=cache_strategy, cache_size=cache_size)
@@ -206,5 +206,5 @@ def get_num_of_cache_keys():
 
 if __name__ == '__main__':
     server = WSGIServer(('0.0.0.0', 5000), proxy)
-    set_cache_strategy(cache_strategy="LRU")
+    set_cache_strategy(cache_strategy="InfiniteCache")
     server.serve_forever()
