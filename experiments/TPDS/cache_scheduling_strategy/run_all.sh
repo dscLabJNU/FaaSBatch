@@ -26,7 +26,7 @@ function run() {
 
     # dispatch_intervals=(0.01 0.05 0.1 0.15 0.2 0.3 0.4 0.5)
     dispatch_interval=0.5
-    cache_strategies=("LRU" "LFU" "GDSF" "Random" "InfiniteCache") # "MyCache"）
+    cache_strategies=("LRU" "LFU" "GDSF" "Random" "InfiniteCache") # "IdelCache"）
     cache_sizes=(2 4 6 8 10 12 14 16 32 64)
 
     for cache_strategy in ${cache_strategies[@]}; do

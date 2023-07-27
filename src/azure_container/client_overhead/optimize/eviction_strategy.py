@@ -126,7 +126,7 @@ class LFU(EvictionStrategy):
         del self.priority[min_priority_key]
 
 
-class MyCache(EvictionStrategy):
+class IdelCache(EvictionStrategy):
     def __init__(self, maxlen=None):
         super().__init__(maxlen)
         self.minlen = self.maxlen
@@ -173,7 +173,7 @@ class MyCache(EvictionStrategy):
             # Usuing LRU as the eviction strategy
             k_v_tuple = cache.pool.popitem(last=False)
             evict_key = k_v_tuple[0]
-            logger.info(f"Evicting MyCache cache with key: [{evict_key}]")
+            logger.info(f"Evicting IdelCache cache with key: [{evict_key}]")
             if evict_key in cache.hits:
                 del cache.hits[evict_key]
             if evict_key in cache.req_iat:

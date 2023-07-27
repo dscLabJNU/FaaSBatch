@@ -23,7 +23,7 @@ reqs = [
      } for id in range(1, concurrency+1)
 ]
 r = requests.post(base_url.format(5000, "set_strategy"),
-                  json={"cache_strategy": "MyCache", "cache_size": None})
+                  json={"cache_strategy": "IdelCache", "cache_size": None})
 r = requests.post(base_url.format(5000, 'batch_run'), json=reqs)
 r = requests.get(base_url.format(5000, 'cache_info'))
 print(r.json())

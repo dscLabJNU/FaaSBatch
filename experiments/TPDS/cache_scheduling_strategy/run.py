@@ -175,7 +175,7 @@ def parse_args():
                         help="Select the intensive type in which azure_bench mode")
     
     parser.add_argument("--cache_strategy", type=str, required=True, choices=[
-                        "LRU", "LFU", "GDSF", "MyCache", "Random", "InfiniteCache"], help="Select the cache strategy")
+                        "LRU", "LFU", "GDSF", "IdelCache", "Random", "InfiniteCache"], help="Select the cache strategy")
     parser.add_argument("--cache_size", type=int, required=False, help="Indicate the cache size")
     return parser.parse_args()
 
