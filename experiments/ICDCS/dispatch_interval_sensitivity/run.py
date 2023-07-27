@@ -90,7 +90,7 @@ def analyze(mode, results_dir, azure_type=None):
             # CPU function uses AzureFunction trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureFunction]
             azure = AzureFunction(workflow_info, azure_type)
-            num_invos = 800
+            num_invos = 5000
         elif AzureType.IO in azure_type:
             num_invos = 10000
             # I/O function uses AzureBlob trace
@@ -148,15 +148,6 @@ def analyze(mode, results_dir, azure_type=None):
         print(cnt)
         print(f"This experiment will be done in {trace_time/60} mins")
         gevent.joinall(jobs)
-
-    print(f"e2e_dict: {e2e_dict}")
-    e2e_latencies = []
-    for workflow in workflow_pool:
-        e2e_latencies.append(e2e_dict[workflow])
-    df = pd.DataFrame({'workflow': workflow_pool,
-                      'e2e_latency': e2e_latencies})
-    csv_name = f"{results_dir}/{mode}_{azure_type if mode == 'azure_bench' else 'normal'}.csv"
-    df.to_csv(csv_name, index=False)
 
 
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
