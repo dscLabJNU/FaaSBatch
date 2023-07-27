@@ -1,2 +1,2 @@
 strategy,dispatch_interval,num_containers
-FaaSBatch,MyCache_4,75
+FaaSBatch,IdelCache_32,83
