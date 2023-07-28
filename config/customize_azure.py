@@ -1,15 +1,21 @@
 import glob
 import json
+import os
 # Customize for Azure-bench
 
-AZURE_BENCH_ADDR = '/home/vagrant/batching-request/benchmark/generator/azure-bench'
+# ======= NEED TO CONFIG =======
+AZURE_TRACE_ADDR = "/data/data1/jairwu/data/Azure"
+# ======= NEED TO CONFIG =======
+
+
+PROJECT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+AZURE_BENCH_ADDR = f"{PROJECT_PATH}/benchmark/generator/azure-bench"
 AZURE_WORKFLOWS_ADDRS = {
     "cpu_optimize": f'{AZURE_BENCH_ADDR}/cpu_workflows/optimize',
     "cpu_native": f'{AZURE_BENCH_ADDR}/cpu_workflows/native',
     "io_native": f'{AZURE_BENCH_ADDR}/io_workflows/native',
     "io_optimize": f'{AZURE_BENCH_ADDR}/io_workflows/optimize',
 }
-AZURE_TRACE_ADDR = "/home/vagrant/data/Azure"
 
 WORKFLOW_NAMES = []
 AZURE_WORKFLOW_YAML_ADDR = {}

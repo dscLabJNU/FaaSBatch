@@ -4,7 +4,7 @@ import pandas as pd
 import sys
 import json
 sys.path.append('../../../config')
-import config
+import customize_azure
 
 def parse_flat_workflow(functions, flat_workflow):
     for func_name in functions:
@@ -84,10 +84,10 @@ def process_and_dump(df, workflow_type, intensive, method):
 intensive_dict = {"io": ["optimize", "native"],
                   "cpu": ["optimize","native"]}
 if __name__ == "__main__":
-    data_dir = config.AZURE_DATA_DIR
+    data_dir = customize_azure.AZURE_TRACE_ADDR
     # Do not change the csv file, cause different df incurs different mapper json files
     df = pd.read_csv(
-        f"{data_dir}/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt")
+        f"{data_dir}/AzureFunctionsInvocationTraceForTwoWeeksJan2021/AzureFunctionsInvocationTraceForTwoWeeksJan2021.txt")
 
     # Delete previous workflows
     os.system("rm -rf ./*workflows/")

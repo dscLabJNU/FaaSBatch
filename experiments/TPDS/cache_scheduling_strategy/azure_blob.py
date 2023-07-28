@@ -21,7 +21,7 @@ class AzureBlob:
         print("Loading Azure Blob dataset...")
         # TODO delete the nrow limit
         df = pd.read_csv(
-            f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionBlobAccessTrace/azurefunctions-accesses-2020-day{day:02d}.csv", nrows=20000)
+            f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionsInvocationTraceForTwoWeeksJan2021/AzureFunctionBlobAccessTrace/azurefunctions-accesses-2020-day{day:02d}.csv", nrows=20000)
         return df
 
     def load_mappers(self):
