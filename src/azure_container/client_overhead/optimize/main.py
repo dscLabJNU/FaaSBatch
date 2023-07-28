@@ -37,7 +37,10 @@ def main(args=None):
     # log_file = open(f"./logs/s3_resource.csv", 'a')
 
     mem_before = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-    _, _, _, exec_time = get_s3_instance(args=args['azure_data'].get("aws_boto3", {}))
+    s3, bucket_name, bucket_key, exec_time = get_s3_instance(args=args['azure_data'].get("aws_boto3", {}))
+    # portfolios = s3.get_object(Bucket=bucket_name, Key=bucket_key)[
+    #         'Body'].read().decode("utf-8")
+    # print(portfolios)
     mem_after = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
     mem_used = mem_after - mem_before
     # print(f"{time_s3_create},{mem},{concurrency}", file=log_file, flush=True)
@@ -50,4 +53,4 @@ def main(args=None):
 
 
 if __name__ == "__main__":
-    print(main({"concurrency": 2}))
+    print(main({"concurrency": 2, "azure_data":{}}))
