@@ -1,3 +1,4 @@
+CURRENT_DIR=$(cd "$(dirname "$0")"; pwd)
 # install docker
 sudo apt-get update
 sudo apt-get install -y \
@@ -18,10 +19,11 @@ sudo apt-get install wondershaper
 docker pull couchdb
 docker run -itd -p 5984:5984 -e COUCHDB_USER=openwhisk -e COUCHDB_PASSWORD=openwhisk --name couchdb couchdb
 apt-get install python3-pip -y
+cd $CURRENT_DIR
 python3 couchdb_starter.py
 # install redis
 docker pull redis
 docker run -itd -p 6379:6379 --name redis redis
 # run grouping for all benchmarks
-cd ../src/grouping
+cd $CURRENT_DIR/../src/grouping
 python3 grouping.py azure_bench_all
