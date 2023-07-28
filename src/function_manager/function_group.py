@@ -234,6 +234,7 @@ class FunctionGroup():
         print(
             f"request {req.function.info.function_name} is done, recording the execution infomation...")
         self.historical_reqs.append(req)
+        self.history_duration.append(req.duration)
         result = req.result.get()
         print(f"Result is: {result}")
         exec_time = result['exec_time']
