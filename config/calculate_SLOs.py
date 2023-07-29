@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-PROJECT_PATH = os.path.dirname(os.getcwd())
+PROJECT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 baseline_csv = f"{PROJECT_PATH}/src/workflow_manager/tmp/latency_amplification_BaseBatching.csv"
 if not os.path.exists(baseline_csv):
