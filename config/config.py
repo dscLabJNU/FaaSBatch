@@ -3,8 +3,8 @@ import customize_azure
 
 # ======= NEED TO CONFIG =======
 MASTER_IP = "192.168.1.18"
-WORKER_IP = "192.168.1.18"
-SFSPATH = "/home/jairwu/go/src/SFS-batching-requests" 
+SFSPATH = "/home/jairwu/go/src/SFS-batching-requests"
+RESOURCE_MONITOR = "/home/jairwu/resource/FaaS/openwhisk-resource-monitor"
 # ======= NEED TO CONFIG =======
 
 
