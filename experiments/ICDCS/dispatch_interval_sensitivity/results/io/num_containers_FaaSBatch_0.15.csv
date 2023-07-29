@@ -1,2 +1,2 @@
 strategy,dispatch_interval,num_containers
-Batching,0.1,18
+FaaSBatch,0.15,25
