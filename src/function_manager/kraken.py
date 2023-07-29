@@ -11,12 +11,6 @@ import pandas as pd
 import math
 sys.path.append('../../config')
 import config
-# from core_manager import CoreManaerger
-# num_cores = multiprocessing.cpu_count()
-# # idel_cores = [i for i in range(num_cores)]
-# core_manager = CoreManaerger(
-#     available_cores=[str(i) for i in range(num_cores)])
-
 
 def read_function_load():
     batching_path = config.PROJECT_PATH
@@ -101,7 +95,7 @@ class Kraken(FunctionGroup):
         """
         avg_duration = self.history_duration.get_mean()
         if not avg_duration:
-            logging.info(f"Not avg. duration yet")
+            print(f"Not avg. duration yet")
             return len(local_rq)
 
         function_name = function.info.function_name
@@ -114,9 +108,9 @@ class Kraken(FunctionGroup):
         # batches = 0 if predict_load is zero, because some functions may have only one invocation
         batches = math.ceil(predict_load / batch_size) or len(local_rq)
 
-        logging.info(
+        print(
             f"avg. duration is {avg_duration}, now set the batch size as {batches}")
-        logging.info(
+        print(
             f"Number of containers estimated by Kraken is: {batches}")
 
         return batches
@@ -131,14 +125,14 @@ class Kraken(FunctionGroup):
 
         # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
         candidate_containers = []
-        logging.info(f"We need {num_containers} of containers")
+        print(f"We need {num_containers} of containers")
 
         # 1. Obtain as many containers as possible from the container pool
         while len(self.container_pool) and container_retrieved < num_containers:
             container = self.self_container(function=function)
             candidate_containers.append(container)
             container_retrieved += 1
-        logging.info(f"Get {container_retrieved} of containers from the pool")
+        print(f"Get {container_retrieved} of containers from the pool")
 
         # 2. Create remaining containers
         new_containers = self.create_containers_in_blocking(

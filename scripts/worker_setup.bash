@@ -1,3 +1,5 @@
+CURRENT_DIR=$(cd "$(dirname "$0")"; pwd)
+
 # install docker
 sudo apt-get update
 sudo apt-get install python3-pip -y
@@ -19,7 +21,6 @@ sudo chmod g+rwx "/home/$USER/.docker" -R
 # install redis
 docker pull redis
 docker run -itd -p 6379:6379 --name redis redis
-cd ../benchmark/generator/azure-bench
+cd $CURRENT_DIR../benchmark/generator/azure-bench
 python3 generate_trace.py
 python3 build_images.py
-cd -

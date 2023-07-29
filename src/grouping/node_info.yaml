@@ -1,5 +1,5 @@
 nodes:
-- worker_address: 10.0.0.101:8000
+- worker_address: 192.168.1.18:8000
   scale_limit: 60
 # - worker_address: 10.0.0.102:8000
 #   scale_limit: 60

@@ -21,7 +21,7 @@ class AzureFunction:
     def load_df(self, day):
         print("Loading Azure Function dataset...")
         df = pd.read_csv(
-            f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionsInvocationTraceForTwoWeeksJan2021Day{day:02d}.csv")
+            f"{customize_azure.AZURE_TRACE_ADDR}/AzureFunctionsInvocationTraceForTwoWeeksJan2021/AzureFunctionsInvocationTraceForTwoWeeksJan2021Day{day:02d}.csv")
         df['start_timestamp'] = df['end_timestamp'] - df['duration']
         # print(df['invo_ts'])
         return df

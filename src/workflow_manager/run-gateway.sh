@@ -27,5 +27,5 @@ if [[ $# -lt 1 ]]; then
     usage
 else
     check_ip $1
-sudo python3 gateway.py $1 7000
+python3 gateway.py $1 7000
 fi

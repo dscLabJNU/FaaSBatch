@@ -125,7 +125,7 @@ def analyze(mode, results_dir, cache_data, azure_type=None):
     but for containers that end the experiment but do not reach the lifetime, 
     we actively record the hit ratio so that we can start the next experiment early.
     """
-    requests.post('http://10.0.0.101:8000/finalize_hit_rate')
+    requests.post(f'http://{config.MASTER_HOST}/finalize_hit_rate')
 
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type, cache_data):
     invo_ts = row['invo_ts']
