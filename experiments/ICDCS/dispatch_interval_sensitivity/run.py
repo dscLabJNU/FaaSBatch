@@ -90,7 +90,7 @@ def analyze(mode, results_dir, azure_type=None):
             # CPU function uses AzureFunction trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureFunction]
             azure = AzureFunction(workflow_info, azure_type)
-            num_invos = 5000
+            num_invos = 2000
         elif AzureType.IO in azure_type:
             num_invos = 2000
             # I/O function uses AzureBlob trace
