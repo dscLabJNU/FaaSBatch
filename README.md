@@ -20,7 +20,10 @@ FaaSBatch is developed based on the [FaaSFlow](https://github.com/lzjzx1122/FaaS
 
 ## About Config Setting
 
-There are 2 places for config setting. `src/container/container_config.py` specifies CouchDB and Redis's address, you need to fill in correct IP so that application code can directly connect to database inside container environment. All other configurations are in `config/config.py`.
+There are 3 places for config setting. 
+1. `./config/config.py`: reset the client IP (MASTER_IP), path to the SFS (SFSPATH) and path to the resource monitor (RESOURCE_MONITOR) 
+2. `./config/customize_azure.py`: reset the Azure dataset path (AZURE_TRACE_ADDR)
+3. `./src/grouping/node_info.yaml`: reset the worker IPs
 
 ## Installation and Software Dependencies
 
