@@ -10,7 +10,7 @@ workflow_path="$PROJECT_DIR/src/workflow_manager"
 latency_log_path="$workflow_path/tmp"
 resource_log_path=$RESOURCE_MONITOR_PATH
 
-dev01_ip='"192.168.1.18"'
+dev01_ip=$(grep -v "^#" $PROJECT_DIR/src/grouping/node_info.yaml | awk -F: '/worker_address/ {print $2}' | tr -d ' ')
 dev03_ip=$MASTER_IP
 
 # Write the values to experiment.config
