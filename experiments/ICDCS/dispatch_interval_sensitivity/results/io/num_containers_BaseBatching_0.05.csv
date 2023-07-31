@@ -1,2 +1,2 @@
 strategy,dispatch_interval,num_containers
-BaseBatching,0.05,230
+BaseBatching,0.05,366
