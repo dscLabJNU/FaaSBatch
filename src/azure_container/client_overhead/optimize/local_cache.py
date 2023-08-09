@@ -27,6 +27,9 @@ class LocalCache():
         # in MB
         return psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024 / 8
 
+    def get_pool_keys(self):
+        return self.pool.keys()
+
     def cache_info(self):
         try:
             total_hits = sum(self.hits.values())
@@ -34,7 +37,7 @@ class LocalCache():
             logger.info(f"Getting hit rate... [{total_hits}/{total_invos}]")
             hit_rate = total_hits / total_invos
             memory_used = self.get_cur_mem_util() - self.init_mem_util
-            return {"hits": total_hits, "invos": total_invos, 
+            return {"hits": total_hits, "invos": total_invos,
                     "hit_rate": hit_rate, "memory_used": memory_used}
         except ZeroDivisionError:
             logger.error("Error: No requests received yet, division by zero, ")

@@ -10,6 +10,7 @@ import boto3
 from local_cache import LocalCache
 import const
 import logging
+import hashlib
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -59,6 +60,12 @@ class Runner:
             responses[req['function_id']] = __main__(req)
 
 
+def hash_string(s):
+    sha1 = hashlib.sha1()
+    sha1.update(s.encode('utf-8'))
+    return sha1.hexdigest()
+
+
 proxy = Flask(__name__)
 proxy.status = 'new'
 proxy.debug = False
@@ -76,7 +83,11 @@ def open_hook(*args, **kwargs):
         The {KEY: VALUE} relationship is maintained by `result_cache`
     """
     combind_inputs = (args, tuple(sorted(kwargs.items())))
-    hash_args = hash(str(combind_inputs))
+    if 'aws_access_key_id' not in kwargs:
+        yield aspectlib.Proceed
+        return
+    
+    hash_args = hash_string(str(kwargs))
     if hash_args not in unavialble_key:
         # There are some None input to generate None ouput
         result = result_cache.get(hash_args)
@@ -196,6 +207,7 @@ def batch_run():
         t.join()
     proxy.status = 'ok'
     logger.debug(f"{len(cached_keys)} of keys are cached")
+    responses.update({"cached_keys": list(result_cache.get_pool_keys())})
     return responses
 
 
@@ -205,6 +217,6 @@ def get_num_of_cache_keys():
 
 
 if __name__ == '__main__':
-    server = WSGIServer(('0.0.0.0', 5000), proxy)
+    server = WSGIServer(('0.0.0.0', const.PROXY_PORT), proxy)
     set_cache_strategy(cache_strategy="InfiniteCache")
     server.serve_forever()
