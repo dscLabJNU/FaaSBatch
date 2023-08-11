@@ -89,19 +89,39 @@ class FaaSBatch(FunctionGroup):
         return c_r_mapping
 
     def select_containers_by_aws_arguments(self, local_rq):
-        c_r_mapping = defaultdict(lambda: [])
+        c_r_mapping = defaultdict(list)
+
+        # Step 1: Collect all possible containers for each aws_boto3_argument
+        aws_arg_to_containers = defaultdict(list)
         for req in local_rq:
             azure_data = req.data.get('azure_data', {})
             aws_boto3_argument = azure_data.get('aws_boto3', {})
             if aws_boto3_argument:
                 hash_aws_arg = hash_string(str(aws_boto3_argument))
-
-                # mapping container->req by ananlyzing the aws_arguments
                 containers = self.cached_key_map.get(hash_aws_arg, [])
-                for container in containers:
-                    c_r_mapping[container].append(req)
+                aws_arg_to_containers[hash_aws_arg].extend(containers)
+
+        # Step 2: Compute the load of each container
+        container_load = defaultdict(int)
+        for containers in aws_arg_to_containers.values():
+            for container in containers:
+                container_load[container] += 1
+
+        # Step 3: Assign each request to the container with the least load
+        for req in local_rq:
+            azure_data = req.data.get('azure_data', {})
+            aws_boto3_argument = azure_data.get('aws_boto3', {})
+            if aws_boto3_argument:
+                hash_aws_arg = hash_string(str(aws_boto3_argument))
+                containers = aws_arg_to_containers[hash_aws_arg]
+                if containers:
+                    # Find the container with the least load
+                    min_load_container = min(
+                        containers, key=lambda c: container_load[c])
+                    c_r_mapping[min_load_container].append(req)
+                    container_load[min_load_container] += 1
                     print(
-                        f"Plan sending {hash_aws_arg} to {container.container.id}")
+                        f"Plan sending {hash_aws_arg} to {min_load_container.container.id}")
 
         print(f"container->req mapping: {c_r_mapping}")
 
