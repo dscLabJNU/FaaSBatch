@@ -7,6 +7,7 @@ import json
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as ticker
+import hashlib
 import os
 from utils import SamplingMode
 
@@ -55,12 +56,42 @@ class AzureBlob:
         # plt.xticks(fontsize=8)
         fig.savefig("imgs/AzureBlobWorkloadRPS.pdf", bbox_inches='tight')
 
+    def filter_by_freq(self, threshold=10):
+        df = self.df
+
+        df['aws_boto3'] = (
+            df['AnonUserId'].astype(str) + "_key_id," +
+            df['AnonUserId'].astype(str) + "_access_key," +
+            df['AnonRegion'].astype(str) + "," +
+            df['AnonBlobName'].astype(str) + df['AnonBlobETag'].astype(str) + "_name," +
+            df['AnonBlobName'].astype(str) + df['AnonBlobETag'].astype(str) + "_key," +
+            df['Read'].astype(str)
+        )
+        # 使用 SHA-1 计算 aws_boto3 的 hash 值
+        df['aws_boto3_hash'] = df['aws_boto3'].apply(
+            lambda x: hashlib.sha1(x.encode()).hexdigest())
+        # 首先计算每个哈希值的频次
+        hash_frequency = df['aws_boto3_hash'].value_counts()
+
+        # 找到访问频次大于阈值的哈希值
+        filtered_hashes = hash_frequency[hash_frequency > threshold].index
+
+        # 筛选 df 中的行，其 aws_boto3_hash 值在 filtered_hashes 中
+        filtered_df = df[df['aws_boto3_hash'].isin(filtered_hashes)]
+
+        # Clear the temporary columns
+        filtered_df = filtered_df.drop(columns=['aws_boto3_hash', 'aws_boto3'])
+
+        self.df = filtered_df
+
     def filter_df(self, app_map_dict=None, num_invos=None, mode=SamplingMode.Sequantial):
         """
         mode:
             sequential (default): Starting from the lowest index, select ${num_invos} elements in order.
             uniform: Perform uniform random sampling of ${num_invos} elements from the sequence.
         """
+        # We want to test the hot data
+        self.filter_by_freq()
 
         df = self.df
         start = self.info['time_line_start']
