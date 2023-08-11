@@ -4,6 +4,14 @@ import numpy as np
 import time
 from history_record import HistoryRecord
 from thread import ThreadWithReturnValue
+import hashlib
+from collections import defaultdict
+
+
+def hash_string(s: str):
+    sha1 = hashlib.sha1()
+    sha1.update(s.encode('utf-8'))
+    return sha1.hexdigest()
 
 
 class FaaSBatch(FunctionGroup):
@@ -16,6 +24,8 @@ class FaaSBatch(FunctionGroup):
         self.defer_times = HistoryRecord(update_interval=np.inf)
         self.executing_rqs = []
         self.historical_reqs = []
+        # container_id -> cached_keys
+        self.cached_key_map = defaultdict(lambda: [])
 
         if not FaaSBatch.log_file:
             FaaSBatch.log_file = open(
@@ -75,6 +85,29 @@ class FaaSBatch(FunctionGroup):
                 f"{container_created} of containers have been created")
         return candidate_containers
 
+    def resort_mapping(self, c_r_mapping):
+        return c_r_mapping
+
+    def select_containers_by_aws_arguments(self, local_rq):
+        c_r_mapping = defaultdict(lambda: [])
+        for req in local_rq:
+            azure_data = req.data.get('azure_data', {})
+            aws_boto3_argument = azure_data.get('aws_boto3', {})
+            if aws_boto3_argument:
+                hash_aws_arg = hash_string(str(aws_boto3_argument))
+
+                # mapping container->req by ananlyzing the aws_arguments
+                containers = self.cached_key_map.get(hash_aws_arg, [])
+                for container in containers:
+                    c_r_mapping[container].append(req)
+                    print(
+                        f"Plan sending {hash_aws_arg} to {container.container.id}")
+
+        print(f"container->req mapping: {c_r_mapping}")
+
+        # balance the mapping relationship
+        return self.resort_mapping(c_r_mapping)
+
     def dispatch_request(self):
         # Only process the request that req.processing == False
         self.b.acquire()
@@ -90,18 +123,30 @@ class FaaSBatch(FunctionGroup):
 
         function = local_rq[0].function
 
-        # Create or get containers
-        candidate_containers = self.dynamic_reactive_scaling(
-            function=function, local_rq=local_rq)
-
         # Map reqeusts to containers and run them
-        threads = self.map_and_run_rqs(local_rq, candidate_containers)
+        c_r_mapping = self.select_containers_by_aws_arguments(local_rq)
+        print(f"c_r_mapping: {c_r_mapping}, {not c_r_mapping}")
+        if not c_r_mapping:
+            # Create or get containers
+            candidate_containers = self.dynamic_reactive_scaling(
+                function=function, local_rq=local_rq)
+            c_r_mapping = self.normal_mapping(local_rq, candidate_containers)
+        threads = self.execute_requests(c_r_mapping)
 
         # Record exec time, remove running requests, and put container to pool
         # Note that one thread may contains several request results
         self.finish_threads(threads)
 
-    def map_and_run_rqs(self, local_rq, candidate_containers):
+    def execute_requests(self, c_r_mapping):
+        threads = []
+        for c, reqs in c_r_mapping.items():
+            t = ThreadWithReturnValue(
+                target=c.send_batch_requests, args=(reqs, self.executing_rqs,))
+            threads.append(t)
+            t.start()
+        return threads
+
+    def normal_mapping(self, local_rq, candidate_containers):
         idx = 0
         # Mapping requests to containers
         print(
@@ -113,14 +158,7 @@ class FaaSBatch(FunctionGroup):
             self.rq.remove(req)  # ???
             c_r_mapping[container].append(req)
             idx = (idx + 1) % len(candidate_containers)
-
-        threads = []
-        for c, reqs in c_r_mapping.items():
-            t = ThreadWithReturnValue(
-                target=c.send_batch_requests, args=(reqs, self.executing_rqs,))
-            threads.append(t)
-            t.start()
-        return threads
+        return c_r_mapping
 
     def finish_threads(self, threads):
         for t in threads:
@@ -136,3 +174,22 @@ class FaaSBatch(FunctionGroup):
             # core_manager.release_busy_cores(container)
             for req in requests:
                 self.record_info(req=req, log_file=FaaSBatch.log_file)
+
+        # Only report the latest info.
+        # TODO maintain a timestamp ??
+        self.update_global_keys(
+            cached_keys=result['cached_keys'], container=container)
+
+    def update_global_keys(self, cached_keys, container):
+        """
+        Mapping:
+            cached_key1 -> container1
+            cached_key2 -> container1
+        """
+        if not cached_keys:
+            return
+        self.b.acquire()
+        for aws_key in cached_keys:
+            print(f"Mapping {aws_key} to container {container}")
+            self.cached_key_map[aws_key].append(container)
+        self.b.release()

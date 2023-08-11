@@ -18,7 +18,7 @@ class Container:
             # Maps a list [0,1,3] to a str '0,1,3'
             bind_cpus_str = ','.join(list(map(lambda x: str(x), bind_cpus)))
             run_params.update({"cpuset_cpus": bind_cpus_str})
-        print(f"run_params: {run_params}")
+        # print(f"run_params: {run_params}")
         start = time.time()
         container = client.containers.run(image_name, **run_params)
         res = cls(container, port, attr)
@@ -76,10 +76,11 @@ class Container:
             print(f"executing req: {req.function_id}")
 
         d_list = list(map(lambda x: x.data, reqs))
-        print(f"data list is: {d_list}")
+        # print(f"data list is: {d_list}")
         r = requests.post(base_url.format(self.port, 'batch_run'), json=d_list)
-        print(f"Received {len(r.json())} of result of this batching")
+        # print(f"Received {len(r.json())} of result of this batching")
         print(f"r.json() = {r.json()}")
+        cached_keys = r.json().get("cached_keys", [])
         for req in reqs:
             if len(r.json()) == 0:
                 # For some non-return functions
@@ -91,9 +92,9 @@ class Container:
             req.result.set(res)
             req.end_exec = time.time()
             req.duration = (req.end_exec - req.start_exec) * 1000
-            print(f"Result of request: {function_id} is {res}")
+            # print(f"Result of request: {function_id} is {res}")
         self.lasttime = time.time()
-        return {"container": self, "requests": reqs}
+        return {"container": self, "requests": reqs, "cached_keys": cached_keys}
 
     # initialize the container
     def init(self, workflow_name, function_name):
