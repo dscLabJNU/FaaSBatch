@@ -18,12 +18,14 @@ from azure_blob import AzureBlob
 from utils import AzureTraceSlecter, AzureType, SamplingMode
 import argparse
 import os
+from requests.exceptions import Timeout, RequestException
 
 repo = Repository()
 TEST_PER_WORKFLOW = 2 * 60
 TEST_CORUN = 2 * 60
 TIMEOUT = 100
 e2e_dict = {}
+completed_jobs = 0
 
 
 def run_workflow(workflow_name, request_id, azure_data=None):
@@ -35,46 +37,28 @@ def run_workflow(workflow_name, request_id, azure_data=None):
         })
     try:
         rep = requests.post(url, json=data, timeout=TIMEOUT)
-        # rep = requests.post(url, json=data)
-        return rep.json()['latency']
-    except Exception:
+        latency = rep.json()['latency']
+        return latency
+    except Timeout:
         print(f'{workflow_name} timeout')
-        return 1000
+    except KeyError:
+        print(f'{workflow_name} JSON does not contain latency')
+    except ValueError:
+        print(f'{workflow_name} response could not be decoded as JSON')
+    except RequestException as e:
+        print(f'{workflow_name} request failed with exception: {e}')
+    except Exception as e:
+        print(f'{workflow_name} unexpected exception: {e}')
+
+    return 1000
 
 
-def analyze_azure_workflow(workflow_name, azure_data):
-    global e2e_dict
+def analyze_azure_workflow(workflow_name, azure_data, num_invos):
+    global completed_jobs
     id = str(uuid.uuid4())
     e2e_latency = run_workflow(workflow_name, id, azure_data)
-    e2e_dict[workflow_name] = e2e_latency
-
-
-def analyze_workflow(workflow_name, mode):
-    global e2e_dict
-    total = 0
-    start = time.time()
-    e2e_total = 0
-    timeout = 0
-    LIMIT = TEST_PER_WORKFLOW if mode == 'single' else TEST_CORUN
-    while timeout < 5 and (total < 3 or time.time() - start <= LIMIT):
-        total += 1
-        id = str(uuid.uuid4())
-        print(f'----firing workflow {workflow_name}----', id)
-        e2e_latency = run_workflow(workflow_name, id)
-        if total > 2:
-            if e2e_latency > 100:
-                total = total - 1
-                timeout = timeout + 1
-            else:
-                e2e_total += e2e_latency
-                print('e2e_latency: ', e2e_latency)
-    if timeout >= 5:
-        print(f'{workflow_name} e2e_latency: timeout')
-        e2e_dict[workflow_name] = 'timeout'
-    else:
-        e2e_latency = e2e_total / (total - 2)
-        print(f'{workflow_name} e2e_latency: ', e2e_latency)
-        e2e_dict[workflow_name] = e2e_latency
+    completed_jobs += 1
+    print(f"\r{completed_jobs}/{num_invos} of jobs are completed", end='', flush=True)
 
 
 def analyze(mode, results_dir, azure_type=None):
@@ -121,6 +105,7 @@ def analyze(mode, results_dir, azure_type=None):
                 num_invos=num_invos,
                 mode=SamplingMode.Sequantial
             )
+            azure_function.plot_RPS(azure_function_filtered.copy())
             if len(azure_function_filtered['func']) < len(eval_trace):
                 raise ValueError(
                     f"Not enough rows can be borrowed from AzureFunction trace, {len(eval_trace)} needed, only {len(azure_function_filtered['func'])} of rows ")
@@ -129,6 +114,7 @@ def analyze(mode, results_dir, azure_type=None):
             eval_trace['func'] = azure_function_filtered['func']
             eval_trace['duration'] = azure_function_filtered['duration']
             eval_trace['app'] = azure_function_filtered['app']
+            eval_trace['invo_ts'] = azure_function_filtered['invo_ts']
 
         cnt = 0
         jobs = []
@@ -139,15 +125,15 @@ def analyze(mode, results_dir, azure_type=None):
                 func_map_dict, app_map_dict, row, azure_type)
             trace_time = max(start_ts_sec, trace_time)
             jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
-                        workflow_name=workflow_name, azure_data=azure_data))
+                        workflow_name=workflow_name, azure_data=azure_data, num_invos=num_invos))
             workflow_pool.append(workflow_name)
             cnt += 1
             if cnt == num_invos:
                 break
 
-        print(cnt)
-        print(f"This experiment will be done in {trace_time/60} mins")
+        print(f"This experiment ({cnt} of invocations) will be done in {trace_time/60} mins")
         gevent.joinall(jobs)
+        print()
 
 
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
@@ -171,11 +157,11 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
         # I/O function uses AzureBlob trace
         addition_data = {
             "aws_boto3": {
-                "service_name": "s3",
+                # "service_name": "s3",
                 "aws_access_key_id": f"{row['AnonUserId']}_key_id",
                 "aws_secret_access_key": f"{row['AnonUserId']}_access_key",
                 "region_name": f"{row['AnonRegion']}",
-                "use_ssl": False
+                # "use_ssl": False
                 # "bucket_name": f"{row['AnonBlobName']}{row['AnonBlobETag']}_name",
                 # "bucket_key": f"{row['AnonBlobName']}{row['AnonBlobETag']}_key",
                 # "read": row['Read']
