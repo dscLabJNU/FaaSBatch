@@ -1,6 +1,0 @@
-gevent
-flask 
-aspectlib 
-boto3 
-psutil
-numpy

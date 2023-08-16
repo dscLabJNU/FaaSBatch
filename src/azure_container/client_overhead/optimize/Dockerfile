@@ -1,16 +1,39 @@
-FROM python:3.7-slim
+FROM golang:alpine AS builder
 
-COPY pip.conf /etc/pip.conf
-RUN mkdir /proxy
+LABEL stage=gobuilder
 
-# copy libs
-COPY *.py /proxy/
-COPY requirements.txt /proxy/requirements.txt
-WORKDIR /proxy
+ENV CGO_ENABLED 0
 
-# proxy server runs under port 5000
-EXPOSE 5000
+RUN apk update --no-cache && apk add --no-cache tzdata
 
-RUN pip3 install -r requirements.txt
+WORKDIR /build
 
-CMD [ "python3", "/proxy/proxy.py" ]
+ADD go.mod .
+ADD go.sum .
+RUN go mod download
+COPY . .
+# RUN go build -ldflags="-s -w" -o /app/proxy proxy.go
+RUN go build -o /app/proxy
+
+
+FROM ubuntu:20.04
+
+RUN  sed -i s@/archive.ubuntu.com/@/mirrors.aliyun.com/@g /etc/apt/sources.list
+RUN  apt-get clean
+
+RUN apt-get update && \
+    apt-get install -y schedtool && \
+    apt-get install -y util-linux && \
+    apt-get install -y python3
+# For running sudo schedtool 
+RUN apt-get install -y sudo
+
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /usr/share/zoneinfo/Asia/Shanghai /usr/share/zoneinfo/Asia/Shanghai
+ENV TZ Asia/Shanghai
+
+WORKDIR /app
+COPY --from=builder /app/proxy /app/proxy
+
+CMD ["./proxy"]

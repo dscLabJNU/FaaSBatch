@@ -1,1 +1,1 @@
-docker build --no-cache . -t boto3-client-optimize
+docker build -t azure-client-optimize .
