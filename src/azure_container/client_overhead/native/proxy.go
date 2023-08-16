@@ -60,7 +60,7 @@ func execCmd(schedParams []string, functionId string, activateSFS bool) []byte {
 		logrus.Fatal("Command ", schedParams, " start gets error because: ", err)
 	}
 	if activateSFS {
-		logrus.Info("Sending pid: ", cmd.Process.Pid, "to SFS scheduler")
+		logrus.Info("Sending pid: ", cmd.Process.Pid, " to SFS scheduler")
 		sendToSFSScheduler(cmd.Process.Pid, functionId)
 	}
 
