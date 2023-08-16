@@ -1,31 +1,31 @@
 import requests
-
+import os
 base_url = 'http://127.0.0.1:{}/{}'
+concurrency = 10
+BUCKET = "openwhiskbucket"
+FOLDER = "finra/data"
+PORTFOLIOS = "portfolios.json"
 
-concurrency = 5
-batch_reqs = [
-    {
-        "azure_data": {
-            'function_name': f'azure_func_{id}',
-            'duration': 0.109,
-            'input_n': 34,
-            'activate_SFS': True
-        },
-        "function_id": str(id),
-        "concurrency": concurrency
-    }
-    for id in range(1, concurrency+1)]
-
-single_req = {"duration": 0.01, "function_id": "1", "concurrency": 1,
-              "azure_data": {
-                  'function_name': f'azure_func_{id}',
-                  'duration': 0.109,
-                  'input_n': 34,
-                  'active_SFS': True
-              }, }
-
-# r = requests.post(base_url.format(5000, 'run'), json=single_req)
-r = requests.post(base_url.format(4000, 'batch_run'), json=batch_reqs)
-
+reqs = [
+    {"duration": 0.01,
+     "function_id": str(id),
+     "concurrency": concurrency,
+     "azure_data": {
+         "aws_boto3": {
+             "aws_access_key_id": "AKIAUDE724LEOTYERSHO",
+             "aws_secret_access_key": "4c5Lw1uXQM0ZFHm",
+             "region_name": f"ap-southeast-{id}",
+             "bucket_name": "bucket_name",
+             "bucket_key": os.path.join(FOLDER, PORTFOLIOS),
+             "read": True
+         }
+     },
+     } for id in range(1, concurrency+1)
+]
+# requests.post(base_url.format(5000, 'set_cache_config'), json={"cache_strategy": "Unbounded"})
+r = requests.post(base_url.format(5000, 'batch_run'), json=reqs)
+total_exec = 0
+for i, res in r.json().items():
+    total_exec += res['exec_time']
 print(r.json())
-
+print(f"total execution time: {total_exec} ms")

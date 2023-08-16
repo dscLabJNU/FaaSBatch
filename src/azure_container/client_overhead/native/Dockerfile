@@ -1,29 +1,42 @@
-# recommend not to use the alpine one, it lacks lots of dependencies
-# the slim one ocuppies about 2x space compared to alpine one
-# FROM python:3.7-alpine
-FROM python:3.7-slim
+FROM golang:alpine AS builder
 
-COPY pip.conf /etc/pip.conf
-# RUN sed -i "s@http://deb.debian.org@https://mirrors.ustc.edu.cn/@g" /etc/apt/sources.list && rm -Rf /var/lib/apt/lists/* && apt-get update
-# fulfill the structure requirement of proxy
-RUN mkdir /proxy
+LABEL stage=gobuilder
 
-# copy libs
-COPY proxy.py /proxy/proxy.py
-COPY main.py /proxy/main.py
-WORKDIR /proxy
+ENV CGO_ENABLED 0
 
-# proxy server runs under port 5000
-EXPOSE 5000
+RUN apk update --no-cache && apk add --no-cache tzdata
 
-# for alpine base only
-# RUN apk update && \
-#     apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev make && \
-#     pip install --no-cache-dir gevent flask && \
-#     apk del .build-deps
+WORKDIR /build
 
-# RUN apt-get clean
-# RUN apt-get update
-RUN pip3 install --no-cache-dir gevent flask aspectlib boto3 psutil
+ADD go.mod .
+ADD go.sum .
+RUN go mod download
+COPY . .
+# 编译 main_function/function.go
+RUN go build -o /app/function_exec main_function/function.go
+# 编译 proxy.go
+RUN go build -o /app/proxy
 
-CMD [ "python3", "/proxy/proxy.py" ]
+
+FROM ubuntu:20.04
+
+RUN sed -i s@/archive.ubuntu.com/@/mirrors.aliyun.com/@g /etc/apt/sources.list
+RUN apt-get clean
+
+RUN apt-get update && \
+    apt-get install -y schedtool && \
+    apt-get install -y util-linux && \
+    apt-get install -y python3
+# For running sudo schedtool 
+RUN apt-get install -y sudo
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder /usr/share/zoneinfo/Asia/Shanghai /usr/share/zoneinfo/Asia/Shanghai
+ENV TZ Asia/Shanghai
+
+WORKDIR /app
+# 从构建阶段复制编译后的二进制文件
+COPY --from=builder /app/proxy /app/proxy
+COPY --from=builder /app/function_exec /app/function_exec
+
+CMD ["./proxy"]
