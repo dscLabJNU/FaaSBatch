@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -81,7 +83,7 @@ func createS3Client(params AWSBoto3) *s3.S3 {
 	hasher := sha1.New()
 	hasher.Write(paramsJSON)
 	key := hex.EncodeToString(hasher.Sum(nil))
-
+	start := time.Now()
 	// 尝试从缓存中获取s3Client
 	if cachedClient, found := localCache.Get(key); found {
 		if s3Client, ok := cachedClient.(*s3.S3); ok {
@@ -98,17 +100,19 @@ func createS3Client(params AWSBoto3) *s3.S3 {
 		Region:      aws.String(params.RegionName),
 		Credentials: creds,
 	}
-
 	s3Client := s3.New(session.New(), config)
+	creationTime := time.Since(start).Seconds() * 1000 // In milliseconds
+
+	addParams := make(map[string]interface{})
+	addParams["creationTime"] = creationTime
 
 	// 将新的s3Client添加到缓存
-	localCache.Set(key, s3Client)
+	localCache.Set(key, s3Client, addParams)
 
 	return s3Client
 }
 
-// This function executes serveral requests each time, in diffrerent threads
-func batch_run(c *gin.Context) {
+func batchRun(c *gin.Context) {
 	reqs := make([]map[string]interface{}, 0)
 	c.BindJSON(&reqs)
 	logrus.Debug("req: ", reqs)
@@ -136,7 +140,7 @@ func batch_run(c *gin.Context) {
 func run(c *gin.Context) {
 	req := make(map[string]interface{}, 1)
 	c.BindJSON(&req)
-	logrus.Debug("req: ", req)
+	log.Println("req: ", req)
 	responses := make(map[string]interface{}, 1)
 
 	value, _ := req["function_id"].(string)
@@ -151,9 +155,10 @@ func stats(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-func init_func(c *gin.Context) {
+func initFunc(c *gin.Context) {
 	c.JSON(http.StatusOK, "OK")
 }
+
 func setCacheConfig(c *gin.Context) {
 	var config CacheConfig
 	if err := c.ShouldBindJSON(&config); err != nil {
@@ -174,6 +179,14 @@ func setCacheConfig(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Cache configuration updated successfully"})
 }
 
+func cacheInfo(c *gin.Context) {
+	c.JSON(http.StatusOK, localCache.cacheInfo())
+}
+
+func totalCachedKeys(c *gin.Context) {
+	c.JSON(http.StatusOK, localCache.getTotalCachedKeys())
+}
+
 var localCache *LocalCache
 
 func main() {
@@ -182,10 +195,13 @@ func main() {
 	localCache = NewLocalCache("LRU", 10)
 	route := gin.Default()
 	route.POST("/run", run)
-	route.POST("/batch_run", batch_run)
+	route.POST("/batch_run", batchRun)
 	route.GET("/status", stats)
 	route.POST("/set_cache_config", setCacheConfig)
-	route.POST("/init", init_func)
+	route.POST("/init", initFunc)
+	route.GET("/cache_info", cacheInfo)
+	route.GET("/total_cached_keys", totalCachedKeys)
+
 	add := fmt.Sprintf(":%s", PROXY)
 	route.Run(add)
 

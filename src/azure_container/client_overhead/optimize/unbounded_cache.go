@@ -18,7 +18,7 @@ func (c *UnboundedCache) Get(key string) (interface{}, bool) {
 	return value, found
 }
 
-func (c *UnboundedCache) Set(key string, value interface{}) {
+func (c *UnboundedCache) Set(key string, value interface{}, addParams map[string]interface{}) {
 	logrus.Info("Setting key by UnboundedCache")
 	c.cache[key] = value
 }

@@ -12,11 +12,6 @@ type LRUCache struct {
 	items    *list.List
 }
 
-type entry struct {
-	key   string
-	value interface{}
-}
-
 func NewLRU(capacity int) *LRUCache {
 	return &LRUCache{
 		capacity: capacity,
@@ -34,7 +29,7 @@ func (c *LRUCache) Get(key string) (interface{}, bool) {
 	return nil, false
 }
 
-func (c *LRUCache) Set(key string, value interface{}) {
+func (c *LRUCache) Set(key string, value interface{}, addParams map[string]interface{}) {
 	logrus.Info("Setting key by LRU")
 	if item, found := c.cache[key]; found {
 		c.items.MoveToFront(item)

@@ -75,7 +75,7 @@ class FunctionGroup():
               file=invocation_log, flush=True)
         print("function,load", file=function_load_log, flush=True)
         FunctionGroup.hit_rate_log = hit_rate_log
-        print(f"Container,hits,invos,hit_rate,num_of_cache_keys,memory_used(MB)",
+        print(f"Container,hits,invos,hit_rate,total_cached_keys",
               file=self.hit_rate_log, flush=True)
 
     # put the request into request queue
