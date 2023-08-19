@@ -6,7 +6,7 @@ import requests
 import sys
 sys.path.append('..')
 sys.path.append('../../../config')
-from repository import Repository
+
 import config
 import pandas as pd
 import time
@@ -16,16 +16,18 @@ import customize_azure
 from azure_function import AzureFunction
 from azure_blob import AzureBlob
 from utils import AzureTraceSlecter, AzureType, SamplingMode
+import utils
 import argparse
 import os
 from requests.exceptions import Timeout, RequestException
+from collections import Counter
 
-repo = Repository()
 TEST_PER_WORKFLOW = 2 * 60
 TEST_CORUN = 2 * 60
 TIMEOUT = 100
 e2e_dict = {}
 completed_jobs = 0
+AWS_HASH_KEY_COUNTER = []
 
 
 def run_workflow(workflow_name, request_id, azure_data=None):
@@ -44,6 +46,7 @@ def run_workflow(workflow_name, request_id, azure_data=None):
     except KeyError:
         print(f'{workflow_name} JSON does not contain latency')
     except ValueError:
+        print(rep.text)
         print(f'{workflow_name} response could not be decoded as JSON')
     except RequestException as e:
         print(f'{workflow_name} request failed with exception: {e}')
@@ -133,7 +136,7 @@ def analyze(mode, results_dir, azure_type=None):
 
         print(f"This experiment ({cnt} of invocations) will be done in {trace_time/60} mins")
         gevent.joinall(jobs)
-        print()
+        print(Counter(AWS_HASH_KEY_COUNTER))
 
 
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
@@ -167,6 +170,7 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
                 # "read": row['Read']
             }
         }
+        AWS_HASH_KEY_COUNTER.append(utils.hash_string(str(addition_data.get("aws_boto3"))))
 
     azure_data.update(addition_data)
 
@@ -188,6 +192,4 @@ if __name__ == '__main__':
     results_dir = './results'
     os.system(f"mkdir -p {results_dir}")
     args = parse_args()
-    repo.clear_couchdb_results()
-    repo.clear_couchdb_workflow_latency()
     analyze(args.mode, results_dir, args.azure_type)
