@@ -6,12 +6,17 @@ from history_record import HistoryRecord
 from thread import ThreadWithReturnValue
 import hashlib
 from collections import defaultdict
+from hash_ring import HashRing
 
 
 def hash_string(s: str):
     sha1 = hashlib.sha1()
     sha1.update(s.encode('utf-8'))
     return sha1.hexdigest()
+
+
+SAMPLE_RATE = 0.2
+POPULAR_PERCENTAIL = 90
 
 
 class FaaSBatch(FunctionGroup):
@@ -37,6 +42,11 @@ class FaaSBatch(FunctionGroup):
             self.init_logs(invocation_log=FaaSBatch.log_file,
                            function_load_log=FaaSBatch.function_load_log,
                            hit_rate_log=FaaSBatch.hit_rate_log)
+
+        self.hash_ring = HashRing()
+        self.last_access_times = defaultdict(float)  # 存储每个req的最后访问时间
+        self.iat_estimates = defaultdict(list)      # 存储每个req的IAT
+        self.contaier_load = defaultdict(float)      # 每个容器处理请求的个数
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         res = super().send_request(function, request_id,
@@ -78,6 +88,8 @@ class FaaSBatch(FunctionGroup):
                     function=function, extra_data=request_data)
                 cold_start = (time.time() - start) * 1000  # Coverts s to ms
                 self.time_cold.append(cold_start)
+                # 添加新创建的容器到哈希环
+                self.hash_ring.add_container(container)
 
             candidate_containers.append(container)
             container_created += 1
@@ -128,6 +140,70 @@ class FaaSBatch(FunctionGroup):
         # balance the mapping relationship
         return self.resort_mapping(c_r_mapping)
 
+    def get_aws_arg_arrival_rate(self, hash_aws_arg):
+        # 从记录的 IAT 估计中获取给定 hash_aws_arg 的 IAT
+        iat_estimate = self.iat_estimates.get(hash_aws_arg, 0)
+
+        # 到达率是到达间隔的倒数
+        arrival_rate = 1 / iat_estimate if iat_estimate > 0 else 0
+
+        return arrival_rate
+
+    def identify_popular_requests(self, local_rq):
+        popular_functions = set()
+
+        for req in local_rq:
+            azure_data = req.data.get('azure_data', {})
+            aws_boto3_argument = azure_data.get('aws_boto3', {})
+            if aws_boto3_argument:
+                hash_aws_arg = hash_string(str(aws_boto3_argument))
+                # arrival_time = req.arrival
+                arrival_time = time.time()
+
+                if np.random.rand() < SAMPLE_RATE:
+                    last_access_time = self.last_access_times.get(
+                        hash_aws_arg, arrival_time)
+                    current_iat = arrival_time - last_access_time
+                    iat_estimate = self.iat_estimates.get(
+                        hash_aws_arg, current_iat)
+                    iat_estimate = 0.5 * iat_estimate + 0.5 * current_iat
+
+                    self.iat_estimates[hash_aws_arg] = iat_estimate
+                    self.last_access_times[hash_aws_arg] = arrival_time
+
+        iat_values = list(self.iat_estimates.values())
+        if iat_values:
+            top_p_percentile_iat = np.percentile(
+                iat_values, POPULAR_PERCENTAIL)
+            # print(f"iat_values: {iat_values}, top_p_percentile_iat:{top_p_percentile_iat}")
+            popular_functions = {
+                func for func, iat in self.iat_estimates.items() if iat < top_p_percentile_iat}
+
+        return popular_functions
+
+    def get_container_load(self, container):
+        return self.contaier_load[container]
+
+    def select_containers_with_hash_ring(self, local_rq):
+        c_r_mapping = defaultdict(list)
+
+        for req in local_rq:
+            print(f"this request arrived at: {req.arrival}")
+            azure_data = req.data.get('azure_data', {})
+            aws_boto3_argument = azure_data.get('aws_boto3', {})
+            if aws_boto3_argument:
+                hash_aws_arg = hash_string(str(aws_boto3_argument))
+                container = self.hash_ring.get_container(hash_aws_arg)
+                if container:
+                    c_r_mapping[container].append(req)
+        return c_r_mapping
+
+    def select_containers_by_hash_ring(self, local_rq):
+        popular_functions = self.identify_popular_requests(local_rq)
+        print(f"popular_functions: {popular_functions}")
+        c_r_mapping = self.select_containers_with_hash_ring(local_rq)
+        return c_r_mapping
+
     def dispatch_request(self):
         # Only process the request that req.processing == False
         self.b.acquire()
@@ -144,8 +220,10 @@ class FaaSBatch(FunctionGroup):
         function = local_rq[0].function
 
         # Map reqeusts to containers and run them
-        c_r_mapping = self.select_containers_by_aws_arguments(local_rq)
-        print(f"c_r_mapping: {c_r_mapping}, {not c_r_mapping}")
+        # c_r_mapping = self.select_containers_by_aws_arguments(local_rq)
+        c_r_mapping = self.select_containers_by_hash_ring(local_rq)
+
+        print(f"c_r_mapping: {c_r_mapping}")
         if not c_r_mapping:
             # Create or get containers
             candidate_containers = self.dynamic_reactive_scaling(
@@ -160,6 +238,7 @@ class FaaSBatch(FunctionGroup):
     def execute_requests(self, c_r_mapping):
         threads = []
         for c, reqs in c_r_mapping.items():
+            self.contaier_load[c] += len(reqs)
             t = ThreadWithReturnValue(
                 target=c.send_batch_requests, args=(reqs, self.executing_rqs,))
             threads.append(t)
