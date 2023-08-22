@@ -1,9 +1,7 @@
 from typing import Dict, List
 import requests
-import docker
 import time
 import gevent
-from docker.types import Mount
 
 base_url = 'http://127.0.0.1:{}/{}'
 
@@ -80,7 +78,18 @@ class Container:
         r = requests.post(base_url.format(self.port, 'batch_run'), json=d_list)
         # print(f"Received {len(r.json())} of result of this batching")
         print(f"r.json() = {r.json()}")
-        cached_keys = r.json().get("cached_keys", [])
+        cache_info_resp = requests.get(
+            base_url.format(self.port, 'cache_info'))
+        if cache_info_resp.status_code == 404:
+            cache_info = {}
+            print(
+                f"Please check API /cache_info[{cache_info_resp.request.method}]  is avialble or not")
+        else:
+            cache_info = cache_info_resp.json()
+        cache_infos = {
+            "cached_keys": cache_info.get("cached_keys", []),
+            "cache_capacity": cache_info.get("capacity", None)
+        }
         for req in reqs:
             if len(r.json()) == 0:
                 # For some non-return functions
@@ -94,7 +103,7 @@ class Container:
             req.duration = (req.end_exec - req.start_exec) * 1000
             # print(f"Result of request: {function_id} is {res}")
         self.lasttime = time.time()
-        return {"container": self, "requests": reqs, "cached_keys": cached_keys}
+        return {"container": self, "requests": reqs, "cache_infos": cache_infos}
 
     # initialize the container
     def init(self, workflow_name, function_name):

@@ -4,19 +4,10 @@ import numpy as np
 import time
 from history_record import HistoryRecord
 from thread import ThreadWithReturnValue
-import hashlib
 from collections import defaultdict
 from hash_ring import HashRing
-
-
-def hash_string(s: str):
-    sha1 = hashlib.sha1()
-    sha1.update(s.encode('utf-8'))
-    return sha1.hexdigest()
-
-
-SAMPLE_RATE = 0.2
-POPULAR_PERCENTAIL = 90
+from request_recorder import RequestRecorder, StrategyType
+import utils
 
 
 class FaaSBatch(FunctionGroup):
@@ -29,8 +20,10 @@ class FaaSBatch(FunctionGroup):
         self.defer_times = HistoryRecord(update_interval=np.inf)
         self.executing_rqs = []
         self.historical_reqs = []
-        # container_id -> cached_keys
+        # container -> cached_keys
         self.cached_key_map = defaultdict(lambda: [])
+        # cached_keys -> container
+        self.container_cached_key = defaultdict(lambda: [])
 
         if not FaaSBatch.log_file:
             FaaSBatch.log_file = open(
@@ -44,8 +37,12 @@ class FaaSBatch(FunctionGroup):
                            hit_rate_log=FaaSBatch.hit_rate_log)
 
         self.hash_ring = HashRing()
-        self.last_access_times = defaultdict(float)  # 存储每个req的最后访问时间
-        self.iat_estimates = defaultdict(list)      # 存储每个req的IAT
+        self.request_recorder = RequestRecorder({
+            "identify_strategy": StrategyType.EMA,
+            "hot_percentail": 10
+        })
+        self.container_cache_capacity = None
+
         self.contaier_load = defaultdict(float)      # 每个容器处理请求的个数
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
@@ -109,7 +106,7 @@ class FaaSBatch(FunctionGroup):
             azure_data = req.data.get('azure_data', {})
             aws_boto3_argument = azure_data.get('aws_boto3', {})
             if aws_boto3_argument:
-                hash_aws_arg = hash_string(str(aws_boto3_argument))
+                hash_aws_arg = utils.hash_string(str(aws_boto3_argument))
                 containers = self.cached_key_map.get(hash_aws_arg, [])
                 aws_arg_to_containers[hash_aws_arg].extend(containers)
 
@@ -124,7 +121,7 @@ class FaaSBatch(FunctionGroup):
             azure_data = req.data.get('azure_data', {})
             aws_boto3_argument = azure_data.get('aws_boto3', {})
             if aws_boto3_argument:
-                hash_aws_arg = hash_string(str(aws_boto3_argument))
+                hash_aws_arg = utils.hash_string(str(aws_boto3_argument))
                 containers = aws_arg_to_containers[hash_aws_arg]
                 if containers:
                     # Find the container with the least load
@@ -140,67 +137,40 @@ class FaaSBatch(FunctionGroup):
         # balance the mapping relationship
         return self.resort_mapping(c_r_mapping)
 
-    def get_aws_arg_arrival_rate(self, hash_aws_arg):
-        # 从记录的 IAT 估计中获取给定 hash_aws_arg 的 IAT
-        iat_estimate = self.iat_estimates.get(hash_aws_arg, 0)
-
-        # 到达率是到达间隔的倒数
-        arrival_rate = 1 / iat_estimate if iat_estimate > 0 else 0
-
-        return arrival_rate
-
-    def identify_popular_requests(self, local_rq):
-        popular_functions = set()
-
-        for req in local_rq:
-            azure_data = req.data.get('azure_data', {})
-            aws_boto3_argument = azure_data.get('aws_boto3', {})
-            if aws_boto3_argument:
-                hash_aws_arg = hash_string(str(aws_boto3_argument))
-                # arrival_time = req.arrival
-                arrival_time = time.time()
-
-                if np.random.rand() < SAMPLE_RATE:
-                    last_access_time = self.last_access_times.get(
-                        hash_aws_arg, arrival_time)
-                    current_iat = arrival_time - last_access_time
-                    iat_estimate = self.iat_estimates.get(
-                        hash_aws_arg, current_iat)
-                    iat_estimate = 0.5 * iat_estimate + 0.5 * current_iat
-
-                    self.iat_estimates[hash_aws_arg] = iat_estimate
-                    self.last_access_times[hash_aws_arg] = arrival_time
-
-        iat_values = list(self.iat_estimates.values())
-        if iat_values:
-            top_p_percentile_iat = np.percentile(
-                iat_values, POPULAR_PERCENTAIL)
-            # print(f"iat_values: {iat_values}, top_p_percentile_iat:{top_p_percentile_iat}")
-            popular_functions = {
-                func for func, iat in self.iat_estimates.items() if iat < top_p_percentile_iat}
-
-        return popular_functions
-
     def get_container_load(self, container):
         return self.contaier_load[container]
 
-    def select_containers_with_hash_ring(self, local_rq):
-        c_r_mapping = defaultdict(list)
-
+    def identify_popular_functions(self, local_rq):
         for req in local_rq:
             print(f"this request arrived at: {req.arrival}")
             azure_data = req.data.get('azure_data', {})
             aws_boto3_argument = azure_data.get('aws_boto3', {})
             if aws_boto3_argument:
-                hash_aws_arg = hash_string(str(aws_boto3_argument))
-                container = self.hash_ring.get_container(hash_aws_arg)
+                hash_aws_arg = utils.hash_string(str(aws_boto3_argument))
+                self.request_recorder.add_request(hash_aws_arg, req.arrival)
+
+    def select_containers_with_hash_ring(self, local_rq):
+        c_r_mapping = defaultdict(list)
+
+        for req in local_rq:
+            azure_data = req.data.get('azure_data', {})
+            aws_boto3_argument = azure_data.get('aws_boto3', {})
+            if aws_boto3_argument:
+                hash_aws_arg = utils.hash_string(str(aws_boto3_argument))
+                container = self.hash_ring.get_container(current_key=hash_aws_arg,
+                                                         container_cached_key=self.container_cached_key,
+                                                         cur_container_pool=self.container_pool,
+                                                         cache_capacity=self.container_cache_capacity)
+                print(f"{hash_aws_arg} -> {container}")
                 if container:
                     c_r_mapping[container].append(req)
+        # if len(c_r_mapping.values()) != local_rq:
+        #     print(f"Not enough mapping data, let it go")
+        #     return None
         return c_r_mapping
 
     def select_containers_by_hash_ring(self, local_rq):
-        popular_functions = self.identify_popular_requests(local_rq)
-        print(f"popular_functions: {popular_functions}")
+        self.identify_popular_functions(local_rq)
         c_r_mapping = self.select_containers_with_hash_ring(local_rq)
         return c_r_mapping
 
@@ -254,7 +224,7 @@ class FaaSBatch(FunctionGroup):
         while local_rq:
             container = candidate_containers[idx]
             req = local_rq.pop(0)
-            self.rq.remove(req)  # ???
+            self.rq.remove(req)
             c_r_mapping[container].append(req)
             idx = (idx + 1) % len(candidate_containers)
         return c_r_mapping
@@ -277,18 +247,25 @@ class FaaSBatch(FunctionGroup):
         # Only report the latest info.
         # TODO maintain a timestamp ??
         self.update_global_keys(
-            cached_keys=result['cached_keys'], container=container)
+            cache_infos=result['cache_infos'], container=container)
 
-    def update_global_keys(self, cached_keys, container):
+    def update_global_keys(self, cache_infos, container):
         """
         Mapping:
             cached_key1 -> container1
             cached_key2 -> container1
+        and
+            container1 -> cached_keys1
+            container2 -> cached_keys2
         """
+        cached_keys = cache_infos['cached_keys']
+        cache_capacity = cache_infos['cache_capacity']
         if not cached_keys:
             return
         self.b.acquire()
         for aws_key in cached_keys:
-            print(f"Mapping {aws_key} to container {container}")
+            print(f"Mapping {aws_key} to container {container.container.name}")
             self.cached_key_map[aws_key].append(container)
+        self.container_cached_key[container] = cached_keys
+        self.container_cache_capacity = cache_capacity
         self.b.release()
