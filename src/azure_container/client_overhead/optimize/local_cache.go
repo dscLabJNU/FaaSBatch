@@ -12,6 +12,7 @@ type LocalCache struct {
 	keyRequests     map[string]int
 	mu              sync.Mutex
 	totalCachedKeys int
+	capacity        int
 }
 type entry struct {
 	key   string
@@ -42,7 +43,8 @@ func (lc *LocalCache) cacheInfo() map[string]interface{} {
 		keyDetails[key] = details
 	}
 	info["key_cache_details"] = keyDetails
-
+	info["cached_keys"] = lc.cache.Keys()
+	info["capacity"] = lc.capacity
 	return info
 }
 
@@ -65,6 +67,7 @@ func NewLocalCache(algorithm string, capacity int) *LocalCache {
 		keyHits:     make(map[string]int),
 		keyRequests: make(map[string]int),
 	}
+	localCache.capacity = capacity
 
 	logrus.Infof("Cache strategy set to [%s] with a capacity of [%d]\n", algorithm, capacity)
 

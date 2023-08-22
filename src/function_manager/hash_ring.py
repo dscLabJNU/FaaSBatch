@@ -28,16 +28,41 @@ class HashRing:
             del self.ring[hash_key]
             self.sorted_keys.remove(hash_key)
 
-    def get_container(self, awsBoto3_key):
+    def can_hold_key(slef, container, key, cached_keys):
+        # 加了当前的key之后，容器中的cached_key数量仍没有达到替换条件
+        cur_num_of_cached_keys = len(set(cached_keys).add(key))
+        if cur_num_of_cached_keys > 10:
+            return False
+        return True
+
+    def get_container(self, current_key, container_cached_key, cur_container_pool):
+        """
+        理论上来说self.sorted_keys应该和cur_container_pool对应
+        但是由于这些变量是由self管理的, 在并发量大的情况下有可能无法及时获取正确的数据
+        正常来说, cur_container_pool的更新速度要比sorted_keys快
+        """
         if not self.sorted_keys:
+            # No containers yet
             return None
-        h = self._hash(awsBoto3_key)
-        idx = self._find_key_index(h)
-        container = self.ring[self.sorted_keys[idx]]
-        self.mapping[awsBoto3_key] = container.container.name
-        print(
-            f"AwsBoto3Key -> container: {awsBoto3_key} -> { self.mapping[awsBoto3_key]}")
-        return container
+
+        current_hash = self._hash(current_key)
+        idx = self._find_key_index(current_hash)
+        last_container_in_pool = None
+
+        # 遍历副本，寻找能够存放当前键的容器
+        for _ in range(self.replicas):
+            container = self.ring[self.sorted_keys[idx]]
+            if container in cur_container_pool:
+                # only filter the avialble container
+                last_container_in_pool = container
+                if self.can_hold_key(container=container,
+                                     key=current_key,
+                                     cached_keys=container_cached_key[container]):
+                    return container
+            idx = (idx + 1) % len(self.sorted_keys)
+
+        # 如果没有找到能够存放当前键的容器，则返回最后一个在池中的容器
+        return last_container_in_pool
 
     def _find_key_index(self, h):
         for i, k in enumerate(self.sorted_keys):

@@ -56,7 +56,7 @@ for setting in experiment_settings:
     # EVALUATION METRICS   
     cache_info = requests.get(base_url.format(5000, 'cache_info')).json()
     total_cached_keys = requests.get(base_url.format(5000, 'total_cached_keys')).json()
-    print(total_cached_keys)
+    print(cache_info)
     for index, r in rjson.items():
         total_exec += r['exec_time']
     experiment_results_warm[cache_strategy] = f"{total_exec} ms"
