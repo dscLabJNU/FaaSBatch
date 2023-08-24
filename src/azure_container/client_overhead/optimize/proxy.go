@@ -183,8 +183,8 @@ func cacheInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, localCache.cacheInfo())
 }
 
-func totalCachedKeys(c *gin.Context) {
-	c.JSON(http.StatusOK, localCache.getTotalCachedKeys())
+func getFinalCacheInfo(c *gin.Context) {
+	c.JSON(http.StatusOK, localCache.getFinalCacheInfo())
 }
 
 var localCache *LocalCache
@@ -200,7 +200,7 @@ func main() {
 	route.POST("/set_cache_config", setCacheConfig)
 	route.POST("/init", initFunc)
 	route.GET("/cache_info", cacheInfo)
-	route.GET("/total_cached_keys", totalCachedKeys)
+	route.GET("/get_final_cache_info", getFinalCacheInfo)
 
 	add := fmt.Sprintf(":%s", PROXY)
 	route.Run(add)

@@ -6,4 +6,5 @@ type CacheStrategy interface {
 	ShouldEvict() bool
 	Evict()
 	Keys() []string
+	numOfEviction() int
 }

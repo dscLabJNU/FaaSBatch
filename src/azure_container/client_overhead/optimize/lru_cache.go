@@ -7,12 +7,13 @@ import (
 )
 
 type LRUCache struct {
-	capacity int
-	cache    map[string]*list.Element
-	items    *list.List
+	capacity   int
+	cache      map[string]*list.Element
+	items      *list.List
+	numOfEvict int
 }
 
-func NewLRU(capacity int) *LRUCache {
+func NewLRUCache(capacity int) *LRUCache {
 	return &LRUCache{
 		capacity: capacity,
 		cache:    make(map[string]*list.Element),
@@ -48,10 +49,15 @@ func (c *LRUCache) ShouldEvict() bool {
 }
 
 func (c *LRUCache) Evict() {
+	c.numOfEvict++
 	item := c.items.Back()
 	if item != nil {
 		c.InnerRemove(item.Value.(*entry).key)
 	}
+}
+
+func (c *LRUCache) numOfEviction() int {
+	return c.numOfEvict
 }
 
 func (c *LRUCache) InnerRemove(key string) {

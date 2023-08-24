@@ -6,6 +6,10 @@ type UnboundedCache struct {
 	cache map[string]interface{}
 }
 
+func (c *UnboundedCache) numOfEviction() int {
+	return 0
+}
+
 func NewUnboundedCache() *UnboundedCache {
 	return &UnboundedCache{
 		cache: make(map[string]interface{}),

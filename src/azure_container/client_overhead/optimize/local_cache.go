@@ -19,9 +19,10 @@ type entry struct {
 	value interface{}
 }
 
-func (lc *LocalCache) getTotalCachedKeys() map[string]interface{} {
+func (lc *LocalCache) getFinalCacheInfo() map[string]interface{} {
 	info := make(map[string]interface{})
 	info["total_cached_keys"] = lc.totalCachedKeys
+	info["total_num_eviction"] = lc.cache.numOfEviction()
 	return info
 }
 
@@ -53,11 +54,15 @@ func NewLocalCache(algorithm string, capacity int) *LocalCache {
 
 	switch algorithm {
 	case "LRU":
-		cache = NewLRU(capacity)
+		cache = NewLRUCache(capacity)
 	case "Unbounded":
 		cache = NewUnboundedCache()
 	case "GDSF":
-		cache = NewGDSF(capacity)
+		cache = NewGDSFCache(capacity)
+	case "Random":
+		cache = NewRandomCache(capacity)
+	case "LFU":
+		cache = NewLFUCache(capacity)
 	default:
 		logrus.Error("Unknown cache algorithm:", algorithm)
 	}

@@ -1,7 +1,7 @@
 import requests
 import os
 base_url = 'http://127.0.0.1:{}/{}'
-concurrency = 20
+concurrency = 50
 BUCKET = "openwhiskbucket"
 FOLDER = "finra/data"
 PORTFOLIOS = "portfolios.json"
@@ -25,7 +25,10 @@ reqs = [
 experiment_settings = [
     {"cache_strategy": "LRU", "cache_size": 10},
     {"cache_strategy": "Unbounded"},
-    {"cache_strategy": "GDSF", "cache_size": 10}
+    {"cache_strategy": "GDSF", "cache_size": 10},
+    {"cache_strategy": "LRU", "cache_size": 10},
+    {"cache_strategy": "Random", "cache_size": 10}
+    
 ]
 
 experiment_results_cold = {}
@@ -55,8 +58,8 @@ for setting in experiment_settings:
     
     # EVALUATION METRICS   
     cache_info = requests.get(base_url.format(5000, 'cache_info')).json()
-    total_cached_keys = requests.get(base_url.format(5000, 'total_cached_keys')).json()
-    print(cache_info)
+    final_cache_info = requests.get(base_url.format(5000, 'get_final_cache_info')).json()
+    print(final_cache_info)
     for index, r in rjson.items():
         total_exec += r['exec_time']
     experiment_results_warm[cache_strategy] = f"{total_exec} ms"

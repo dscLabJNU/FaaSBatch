@@ -8,17 +8,18 @@ import (
 )
 
 type GDSFCache struct {
-	capacity  int
-	cache     map[string]*list.Element
-	items     *list.List
-	priority  map[string]float64
-	clock     map[string]float64
-	cost      map[string]float64
-	size      map[string]int
-	frequency map[string]int
+	capacity   int
+	cache      map[string]*list.Element
+	items      *list.List
+	priority   map[string]float64
+	clock      map[string]float64
+	cost       map[string]float64
+	size       map[string]int
+	frequency  map[string]int
+	numOfEvict int
 }
 
-func NewGDSF(capacity int) *GDSFCache {
+func NewGDSFCache(capacity int) *GDSFCache {
 	return &GDSFCache{
 		capacity:  capacity,
 		cache:     make(map[string]*list.Element),
@@ -69,11 +70,15 @@ func (c *GDSFCache) ShouldEvict() bool {
 }
 
 func (c *GDSFCache) Evict() {
+	c.numOfEvict++
 	c.CalculatePriority()
 	minPriorityKey := c.MinPriorityKey()
 	c.clock[minPriorityKey] = c.priority[minPriorityKey]
 	logrus.Info("Evicting GDSF cache with key: ", minPriorityKey)
 	c.InnerRemove(minPriorityKey)
+}
+func (c *GDSFCache) numOfEviction() int {
+	return c.numOfEvict
 }
 
 func (c *GDSFCache) CalculatePriority() {
