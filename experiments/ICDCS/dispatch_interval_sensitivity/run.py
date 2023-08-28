@@ -137,6 +137,8 @@ def analyze(mode, results_dir, azure_type=None):
         print(f"This experiment ({cnt} of invocations) will be done in {trace_time/60} mins")
         gevent.joinall(jobs)
         print(Counter(AWS_HASH_KEY_COUNTER))
+        
+        requests.post(f'http://{config.MASTER_HOST}/finalize_hit_rate')
 
 
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):

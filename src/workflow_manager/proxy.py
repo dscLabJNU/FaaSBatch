@@ -102,18 +102,23 @@ def finalize_hit_rate():
     for c in containers:
         ip_add = c.attrs['NetworkSettings']['IPAddress']
         base_url = 'http://'+ip_add+':{}/{}'
-        key_details = requests.get(base_url.format(5000, 'cache_info')).json()['key_cache_details']
+        cache_info_resp = requests.get(base_url.format(5000, 'cache_info')).json()
+        print(f"cache_info_resp: {cache_info_resp}")
+        key_details = cache_info_resp['key_cache_details']
+        if not key_details:
+            continue
         hits = sum([key_detail['hits'] for key_detail in key_details.values()])
         invos = sum([key_detail['invos'] for key_detail in key_details.values()])
         hit_rate = hits/invos
-        total_cached_keys = requests.get(base_url.format(
-            5000, 'total_cached_keys')).json()['total_cached_keys']
+        final_cache_info = requests.get(base_url.format(
+            5000, 'get_final_cache_info')).json()
+        total_cached_keys=final_cache_info['total_cached_keys']
+        total_num_eviction=final_cache_info['total_num_eviction']
         
-        print(f"{c.name},{hits},{invos},{hit_rate},{total_cached_keys}",
+        print(f"{c.name},{hits},{invos},{hit_rate},{total_cached_keys},{total_num_eviction}",
               file=log_file, flush=True)
     return json.dumps({'status': 'ok'})
 
-{'key_hit_rates': {'0f3849cd6a0a352b94a716ecd705de9ab01cf739': 0.5, '0fda523c4f097ece6b5f7b347a91081b62cc4c85': 0.5, '2768491079a367b53353df614b485632e8ffc5c4': 0.5, '384ee2cf51e98e0c356d47870c8d3749ef6d9a91': 0.5, '64644439e4a7e784f9c791c1c536371a2faeeb3e': 0.5, '717be600321e04991998ada30720be99b629e8d4': 0.5, '781a973311ff558ae0d02970217d76a6efafacce': 0.5, '99fd40cdb3aa143885829f476d3e05ed9b6d5261': 0.5, '9edcc2dc8c498dd0534596cf44764c4ea630ac4a': 0.5, 'a7c2b5302dad8572923c15b063d43264c37ca5dd': 0.5}}
 @app.route('/info', methods=['GET'])
 def info():
     return json.dumps(container_names)

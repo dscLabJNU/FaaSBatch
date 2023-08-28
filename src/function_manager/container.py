@@ -83,7 +83,7 @@ class Container:
         if cache_info_resp.status_code == 404:
             cache_info = {}
             print(
-                f"Please check API /cache_info[{cache_info_resp.request.method}]  is avialble or not")
+                f"Please check API /cache_info[{cache_info_resp.request.method}] is avialble or not")
         else:
             cache_info = cache_info_resp.json()
         cache_infos = {
