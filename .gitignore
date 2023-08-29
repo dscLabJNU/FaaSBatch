@@ -7,3 +7,4 @@ benchmark/generator/azure-bench/*workflows/
 *.log
 experiment.config
 *_bak
+*.pdf
