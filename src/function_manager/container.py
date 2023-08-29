@@ -5,7 +5,6 @@ import gevent
 
 base_url = 'http://127.0.0.1:{}/{}'
 
-
 class Container:
     # create a new container and return the wrapper
     @classmethod

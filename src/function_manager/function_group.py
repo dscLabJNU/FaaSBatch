@@ -101,8 +101,8 @@ class FunctionGroup():
             f"Now the length of container pool is {len(self.container_pool) }")
         self.b.acquire()
         if len(self.container_pool) != 0:
-            print('get container from pool of function: %s, pool size: %d',
-                  function.info.function_name, len(self.container_pool))
+            print(
+                f'get container from pool of function: {function.info.function_name}, pool size: {len(self.container_pool)}')
 
             res = self.container_pool.pop(-1)
             res.cold_start = 0
@@ -188,7 +188,8 @@ class FunctionGroup():
                 "cache_strategy", None)
             cache_size = extra_data['azure_data'].get("cache_size", None)
             print(f"cache_strategy: {cache_strategy}, size: {cache_size}")
-            container.set_cache_strategy(cache_strategy=cache_strategy, cache_size=cache_size)
+            container.set_cache_strategy(
+                cache_strategy=cache_strategy, cache_size=cache_size)
 
         return container
 
@@ -259,7 +260,7 @@ class FunctionGroup():
             num_of_cached_keys = requests.get(base_url.format(
                 port, 'num_of_cache_keys')).json()['num_of_cache_keys']
             print(f"{container.container.name},{cache_info['hits']},{cache_info['invos']},{cache_info['hit_rate']},{num_of_cached_keys}",
-                file=self.hit_rate_log, flush=True)
+                  file=self.hit_rate_log, flush=True)
         except Exception as e:
             """
             Only io_optimize container image
@@ -267,6 +268,7 @@ class FunctionGroup():
             """
             print(f"Something happend: {e}")
             pass
+
 
 # life time of different kinds of containers
 exec_lifetime = 600
