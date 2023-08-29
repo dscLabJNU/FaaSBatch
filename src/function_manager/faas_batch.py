@@ -5,7 +5,6 @@ import time
 from history_record import HistoryRecord
 from thread import ThreadWithReturnValue
 from collections import defaultdict
-from hash_ring import HashRing
 from request_recorder import RequestRecorder, StrategyType
 import utils
 
@@ -13,7 +12,7 @@ import utils
 class FaaSBatch(FunctionGroup):
     log_file = None
 
-    def __init__(self, name, functions, docker_client, port_controller) -> None:
+    def __init__(self, name, functions, docker_client, port_controller, hash_ring, container_pool) -> None:
         super().__init__(name, functions, docker_client, port_controller)
         self.history_duration = HistoryRecord(update_interval=np.inf)  # in ms
         self.time_cold = HistoryRecord(update_interval=np.inf)
@@ -36,14 +35,13 @@ class FaaSBatch(FunctionGroup):
                            function_load_log=FaaSBatch.function_load_log,
                            hit_rate_log=FaaSBatch.hit_rate_log)
 
-        self.hash_ring = HashRing()
+        self.hash_ring = hash_ring
+        self.container_pool = container_pool
         self.request_recorder = RequestRecorder({
             "identify_strategy": StrategyType.EMA,
             "hot_percentail": 10
         })
-        self.container_cache_capacity = None
-
-        self.contaier_load = defaultdict(float)      # 每个容器处理请求的个数
+        self.container_cache_capacity = 10
 
     def send_request(self, function, request_id, runtime, input, output, to, keys, duration=None):
         res = super().send_request(function, request_id,
@@ -66,7 +64,8 @@ class FaaSBatch(FunctionGroup):
 
         # 已经创建但是未执行过请求的容器，即创建完毕但是没有放在container_pool的容器，用于将并发请求按顺序排队
         candidate_containers = []
-        print(f"We need {num_containers} of containers")
+        print(
+            f"We need {num_containers} of containers, {len(self.container_pool)} are avaialbled.")
 
         # 1. 先从container pool中获取尽量多可用的容器
         while len(self.container_pool) and container_created < num_containers:
@@ -137,9 +136,6 @@ class FaaSBatch(FunctionGroup):
         # balance the mapping relationship
         return self.resort_mapping(c_r_mapping)
 
-    def get_container_load(self, container):
-        return self.contaier_load[container]
-
     def identify_popular_functions(self, local_rq):
         for req in local_rq:
             print(f"this request arrived at: {req.arrival}")
@@ -151,28 +147,32 @@ class FaaSBatch(FunctionGroup):
 
     def select_containers_with_hash_ring(self, local_rq):
         c_r_mapping = defaultdict(list)
-
+        remaining_request = []
+        print(f"Selecting containers for {len(local_rq)} of requests")
         for req in local_rq:
             azure_data = req.data.get('azure_data', {})
             aws_boto3_argument = azure_data.get('aws_boto3', {})
-            if aws_boto3_argument:
-                hash_aws_arg = utils.hash_string(str(aws_boto3_argument))
-                container = self.hash_ring.get_container(current_key=hash_aws_arg,
-                                                         container_cached_key=self.container_cached_key,
-                                                         cur_container_pool=self.container_pool,
-                                                         cache_capacity=self.container_cache_capacity)
-                print(f"{hash_aws_arg} -> {container}")
-                if container:
-                    c_r_mapping[container].append(req)
-        # if len(c_r_mapping.values()) != local_rq:
-        #     print(f"Not enough mapping data, let it go")
-        #     return None
-        return c_r_mapping
+            if not aws_boto3_argument:
+                continue
+
+            hash_aws_arg = utils.hash_string(str(aws_boto3_argument))
+            container = self.hash_ring.get_container(current_key=hash_aws_arg,
+                                                     container_cached_key=self.container_cached_key,
+                                                     cur_container_pool=self.container_pool,
+                                                     cache_capacity=self.container_cache_capacity
+                                                     )
+            if container:
+                print(
+                    f"Mapping {hash_aws_arg} to {container.container.name}")
+                c_r_mapping[container].append(req)
+                req.cold_start = 0
+            else:
+                remaining_request.append(req)
+        return c_r_mapping, remaining_request
 
     def select_containers_by_hash_ring(self, local_rq):
-        self.identify_popular_functions(local_rq)
-        c_r_mapping = self.select_containers_with_hash_ring(local_rq)
-        return c_r_mapping
+        # self.identify_popular_functions(local_rq)
+        return self.select_containers_with_hash_ring(local_rq)
 
     def dispatch_request(self):
         # Only process the request that req.processing == False
@@ -188,17 +188,34 @@ class FaaSBatch(FunctionGroup):
             return
 
         function = local_rq[0].function
-
+        c_r_mapping = defaultdict(list)
         # Map reqeusts to containers and run them
         # c_r_mapping = self.select_containers_by_aws_arguments(local_rq)
-        c_r_mapping = self.select_containers_by_hash_ring(local_rq)
+        c_r_mapping, remaining_reqs = self.select_containers_by_hash_ring(
+            local_rq)
+        print(f"remaining_reqs: {len(remaining_reqs)}")
 
-        print(f"c_r_mapping: {c_r_mapping}")
+        # 用于存放需要额外处理的请求
+        extra_requests = []
+
+        # 如果 c_r_mapping 为空，将 local_rq 添加到额外请求列表
         if not c_r_mapping:
+            print("Failed to mapping requests in hashRing...")
+            extra_requests.extend(local_rq)
+
+        # 如果 remaining_reqs 不为空，将其添加到额外请求列表
+        if remaining_reqs:
+            extra_requests.extend(remaining_reqs)
+
+        if extra_requests:
+            print(f"Failed to mapping requests in hashRing...")
             # Create or get containers
             candidate_containers = self.dynamic_reactive_scaling(
                 function=function, local_rq=local_rq)
             c_r_mapping = self.normal_mapping(local_rq, candidate_containers)
+
+        for c, r in c_r_mapping.items():
+            print(f"Sending {r} to container {c.container.name}")
         threads = self.execute_requests(c_r_mapping)
 
         # Record exec time, remove running requests, and put container to pool
@@ -208,7 +225,6 @@ class FaaSBatch(FunctionGroup):
     def execute_requests(self, c_r_mapping):
         threads = []
         for c, reqs in c_r_mapping.items():
-            self.contaier_load[c] += len(reqs)
             t = ThreadWithReturnValue(
                 target=c.send_batch_requests, args=(reqs, self.executing_rqs,))
             threads.append(t)
@@ -239,15 +255,12 @@ class FaaSBatch(FunctionGroup):
             for req in requests:
                 self.executing_rqs.remove(req)
             self.put_container(container)
+            self.update_global_keys(
+                cache_infos=result['cache_infos'], container=container)
 
             # core_manager.release_busy_cores(container)
             for req in requests:
                 self.record_info(req=req, log_file=FaaSBatch.log_file)
-
-        # Only report the latest info.
-        # TODO maintain a timestamp ??
-        self.update_global_keys(
-            cache_infos=result['cache_infos'], container=container)
 
     def update_global_keys(self, cache_infos, container):
         """
@@ -260,12 +273,15 @@ class FaaSBatch(FunctionGroup):
         """
         cached_keys = cache_infos['cached_keys']
         cache_capacity = cache_infos['cache_capacity']
+        if not cache_capacity:
+            raise ValueError("cache_capacity cannot be None")
         if not cached_keys:
             return
         self.b.acquire()
         for aws_key in cached_keys:
-            print(f"Mapping {aws_key} to container {container.container.name}")
             self.cached_key_map[aws_key].append(container)
         self.container_cached_key[container] = cached_keys
+        print(
+            f"number of self.container_cached_key: {len(self.container_cached_key.keys())}")
         self.container_cache_capacity = cache_capacity
         self.b.release()

@@ -11,6 +11,7 @@ from port_controller import PortController
 from function import Function
 import subprocess
 import sys
+from hash_ring import HashRing
 sys.path.append('../../config')
 import config
 
@@ -31,7 +32,7 @@ class FunctionManager:
         }
 
         self.init()
-        self.init_func_groups()      
+        self.init_func_groups()    
        
     def init_func_groups(self):
         """
@@ -52,8 +53,16 @@ class FunctionManager:
             group_funcs_map[function_group].append(function)
         
         group_instance = eval(config.STRATEGY)
-        self.function_groups = {group_name: group_instance(name=group_name, functions=functions, 
-                                                          docker_client=self.client, port_controller=self.port_controller)
+        group_init_dict = {
+                "docker_client": self.client,
+                "port_controller": self.port_controller,
+            }
+        if config.STRATEGY == "FaaSBatch":
+            container_pool = []
+            group_init_dict.update({"hash_ring": HashRing()})
+            group_init_dict.update({"container_pool": container_pool})
+
+        self.function_groups = {group_name: group_instance(name=group_name, functions=functions, **group_init_dict)
                                 for group_name, functions in group_funcs_map.items()}
 
     def init(self):
