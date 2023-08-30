@@ -90,8 +90,8 @@ class AzureBlob:
             sequential (default): Starting from the lowest index, select ${num_invos} elements in order.
             uniform: Perform uniform random sampling of ${num_invos} elements from the sequence.
         """
-        # We want to test the hot data
-        self.filter_by_freq()
+        # We want to test the hot data??
+        # self.filter_by_freq()
 
         df = self.df
         start = self.info['time_line_start']

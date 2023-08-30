@@ -162,14 +162,9 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type):
         # I/O function uses AzureBlob trace
         addition_data = {
             "aws_boto3": {
-                # "service_name": "s3",
                 "aws_access_key_id": f"{row['AnonUserId']}_key_id",
                 "aws_secret_access_key": f"{row['AnonUserId']}_access_key",
                 "region_name": f"{row['AnonRegion']}",
-                # "use_ssl": False
-                # "bucket_name": f"{row['AnonBlobName']}{row['AnonBlobETag']}_name",
-                # "bucket_key": f"{row['AnonBlobName']}{row['AnonBlobETag']}_key",
-                # "read": row['Read']
             }
         }
         AWS_HASH_KEY_COUNTER.append(utils.hash_string(str(addition_data.get("aws_boto3"))))
