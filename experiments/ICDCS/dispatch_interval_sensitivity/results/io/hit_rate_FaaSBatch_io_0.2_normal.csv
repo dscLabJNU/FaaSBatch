@@ -1,0 +1,5 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+competent_mestorf,5,7,0.7142857142857143,6,0
+angry_sinoussi,15,18,0.8333333333333334,5,0
+unruffled_kowalevski,859,937,0.9167556029882604,104,84
+nervous_dijkstra,882,976,0.9036885245901639,120,97

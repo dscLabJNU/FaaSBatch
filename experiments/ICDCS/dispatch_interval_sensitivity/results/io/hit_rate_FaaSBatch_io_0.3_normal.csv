@@ -1,0 +1,5 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+jolly_ellis,5,7,0.7142857142857143,6,0
+modest_hoover,15,18,0.8333333333333334,5,0
+magical_goldberg,859,934,0.9197002141327623,104,85
+hopeful_jennings,881,978,0.9008179959100204,121,97

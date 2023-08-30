@@ -1,0 +1,5 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+priceless_meitner,5,7,0.7142857142857143,6,0
+bold_hofstadter,15,18,0.8333333333333334,5,0
+unruffled_kapitsa,855,937,0.9124866595517609,108,84
+optimistic_buck,884,973,0.9085303186022611,118,96

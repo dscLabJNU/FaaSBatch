@@ -1,0 +1,6 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+jovial_saha,889,954,0.9318658280922432,87,76
+vigilant_wing,6,9,0.6666666666666666,11,1
+frosty_wright,817,895,0.9128491620111732,102,89
+blissful_matsumoto,36,43,0.8372093023255814,10,0
+fervent_roentgen,17,23,0.7391304347826086,15,4

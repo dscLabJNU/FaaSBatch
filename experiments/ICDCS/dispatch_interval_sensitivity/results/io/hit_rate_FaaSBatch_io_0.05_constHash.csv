@@ -1,0 +1,3 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+friendly_robinson,893,979,0.9121552604698672,109,95
+thirsty_keldysh,888,964,0.921161825726141,100,82

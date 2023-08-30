@@ -1,0 +1,5 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+nervous_hypatia,5,7,0.7142857142857143,6,0
+admiring_mclean,15,18,0.8333333333333334,5,0
+stupefied_khorana,865,937,0.9231590181430096,98,84
+wonderful_driscoll,891,978,0.911042944785276,111,97

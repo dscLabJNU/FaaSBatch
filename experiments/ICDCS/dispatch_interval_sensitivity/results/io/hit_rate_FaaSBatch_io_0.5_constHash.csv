@@ -1,0 +1,4 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+funny_khorana,944,1024,0.921875,99,75
+happy_hofstadter,814,902,0.9024390243902439,114,89
+hopeful_mirzakhani,6,10,0.6,13,1

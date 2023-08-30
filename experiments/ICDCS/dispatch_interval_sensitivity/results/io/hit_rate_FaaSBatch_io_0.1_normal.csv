@@ -1,0 +1,5 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+hopeful_kowalevski,5,7,0.7142857142857143,6,0
+hungry_feistel,15,18,0.8333333333333334,5,0
+condescending_mccarthy,859,937,0.9167556029882604,104,85
+hardcore_hellman,890,978,0.9100204498977505,112,96

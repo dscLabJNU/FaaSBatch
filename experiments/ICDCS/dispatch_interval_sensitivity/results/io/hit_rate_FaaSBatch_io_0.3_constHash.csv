@@ -1,0 +1,4 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+epic_ptolemy,109,114,0.956140350877193,12,2
+great_faraday,809,896,0.9029017857142857,110,88
+frosty_keller,854,928,0.9202586206896551,96,77

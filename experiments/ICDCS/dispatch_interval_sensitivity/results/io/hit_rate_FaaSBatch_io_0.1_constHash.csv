@@ -1,0 +1,4 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+ecstatic_antonelli,806,886,0.909706546275395,106,91
+jovial_darwin,875,947,0.9239704329461457,92,77
+ecstatic_kapitsa,98,104,0.9423076923076923,13,2

@@ -1,0 +1,5 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+zen_mendeleev,5,7,0.7142857142857143,6,0
+epic_mcclintock,15,18,0.8333333333333334,5,0
+sharp_thompson,854,937,0.9114194236926361,109,83
+ecstatic_agnesi,883,976,0.9047131147540983,119,95

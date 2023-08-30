@@ -1,0 +1,4 @@
+container_name,hits,invos,hit_rate,total_cached_keys,total_num_eviction
+naughty_jackson,33,40,0.825,11,0
+condescending_cray,59,64,0.921875,11,1
+hungry_satoshi,1696,1850,0.9167567567567567,180,138
