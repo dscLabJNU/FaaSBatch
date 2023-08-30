@@ -11,13 +11,44 @@ function execRemoteCMD() {
     remote_host=$1
     ps_command=$2
     exec_command=$3
-    filter_result=$(ssh $remote_host $ps_command)
-    if [ -n "$filter_result" ]; then
-        echo "Executing: ssh $remote_host '$exec_command'"
-        ssh $remote_host "$exec_command"
+
+    # Resolve the IP address of the remote_host
+    remote_ip=$(getent hosts $remote_host | awk '{ print $1 }')
+
+    # Check if the IP address of the remote_host is local
+    local_ips=$(hostname -I)
+    if [[ $local_ips == *"$remote_ip"* ]]; then
+        execLocalCMD "$ps_command" "$exec_command"
     else
-        echo "Nothing to exec of cmd: [$ps_command] in host [$remote_host]"
+        filter_result=$(ssh $remote_host $ps_command)
+        if [ -n "$filter_result" ]; then
+            echo "Executing: ssh $remote_host '$exec_command'"
+            ssh $remote_host "$exec_command"
+        else
+            echo "Nothing to exec of cmd: [$ps_command] in host [$remote_host]"
+        fi
     fi
+}
+
+
+
+function execLocalCMD() {
+    ps_command=$1
+    exec_command=$2
+
+    # Save current working directory
+    old_pwd=$(pwd)
+
+    filter_result=$(eval $ps_command)
+    if [ -n "$filter_result" ]; then
+        echo "Executing: '$exec_command' in local"
+        eval "$exec_command"
+    else
+        echo "Nothing to exec of cmd: [$ps_command]"
+    fi
+
+    # Restore working directory
+    cd "$old_pwd"
 }
 
 function clean_monitor() {
@@ -55,10 +86,11 @@ function clean_previous_containers() {
 }
 
 function rm_utilization_log() {
+    resource_log_path=$(awk -F= '/resource_log_path/{print $2}' experiment.config)
     strategy=$1
     remote_hosts=${@:2}
     echo -e "\n4. Removing utilization log of strategy $strategy"
-    rm_utilization_log_cmd="rm -rf /home/vagrant/openwhisk-resource-monitor/utilization_$strategy.csv"
+    rm_utilization_log_cmd="rm -rf $resource_log_path/utilization_$strategy.csv"
     for remote_host in ${remote_hosts[@]}; do
         ssh $remote_host $rm_utilization_log_cmd
     done
@@ -71,7 +103,9 @@ function run_proxy_gateway() {
     strategy=$1
     dispatch_interval=$2
     remote_hosts=${@:3}
-    cd_cmd="cd /home/vagrant/batching-request/src/workflow_manager"
+    workflow_path=$(awk -F= '/workflow_path/{print $2}' experiment.config)
+
+    cd_cmd="cd $workflow_path"
     export_cmd="export strategy=$strategy; export dispatch_interval=$dispatch_interval"
 
     ps_proxy_cmd="${cd_cmd}; ${export_cmd}; ls run-proxy.sh;"
@@ -80,23 +114,28 @@ function run_proxy_gateway() {
     ps_gateway_cmd="${cd_cmd}; ${export_cmd}; ls run-gateway.sh;"
     launch_gateway_cmd="${ps_gateway_cmd} nohup bash run-gateway.sh"
 
+    dev03_ip=$(awk -F= '/dev-03_ip/{print $2}' experiment.config)
+
     for remote_host in ${remote_hosts[@]}; do
         ip=$(awk -F= '/'$remote_host'_ip/{print $2}' experiment.config)
         execRemoteCMD "${remote_host}" "${ps_proxy_cmd}" "${launch_proxy_cmd} "$ip" > proxy_$strategy.log &"
     done
-
-    execRemoteCMD "dev-03" "${ps_proxy_cmd}" "${launch_gateway_cmd} 10.0.0.103 > gateway_$strategy.log &"
+    
+    execRemoteCMD "dev-03" "${ps_proxy_cmd}" "${launch_gateway_cmd} ${dev03_ip} > gateway_$strategy.log &"
 
 }
 
 function run_monitor() {
+    resource_log_path=$(awk -F= '/resource_log_path/{print $2}' experiment.config)
     strategy=$1
     remote_hosts=${@:2}
-    run_monitor_cmd="cd ~/openwhisk-resource-monitor; nohup ./monitor_resources.sh > utilization_$strategy.csv &"
+    cd_cmd="cd $resource_log_path"
+    ps_command="${cd_cmd}; ls monitor_resources.sh "
+    exec_command="${cd_cmd}; nohup ./monitor_resources.sh > utilization_$strategy.csv &"
     for remote_host in ${remote_hosts[@]}; do
-        ssh $remote_host $run_monitor_cmd
+        execRemoteCMD "${remote_host}" "${ps_command}" "${exec_command}"
     done
-    echo "Run remote monitor processes done... now need to wait for 40 s"
+    echo "Run remote monitor processes done..."
 }
 
 function usage() {

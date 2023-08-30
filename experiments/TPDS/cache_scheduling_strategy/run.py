@@ -6,7 +6,7 @@ import requests
 import sys
 sys.path.append('..')
 sys.path.append('../../../config')
-from repository import Repository
+
 import config
 import pandas as pd
 import time
@@ -16,12 +16,18 @@ import customize_azure
 from azure_function import AzureFunction
 from azure_blob import AzureBlob
 from utils import AzureTraceSlecter, AzureType, SamplingMode
+import utils
 import argparse
 import os
+from requests.exceptions import Timeout, RequestException
+from collections import Counter
 
-repo = Repository()
+TEST_PER_WORKFLOW = 2 * 60
+TEST_CORUN = 2 * 60
 TIMEOUT = 100
 e2e_dict = {}
+completed_jobs = 0
+AWS_HASH_KEY_COUNTER = []
 
 
 def run_workflow(workflow_name, request_id, azure_data=None):
@@ -33,21 +39,32 @@ def run_workflow(workflow_name, request_id, azure_data=None):
         })
     try:
         rep = requests.post(url, json=data, timeout=TIMEOUT)
-        # rep = requests.post(url, json=data)
-        return rep.json()['latency']
-    except Exception:
+        latency = rep.json()['latency']
+        return latency
+    except Timeout:
         print(f'{workflow_name} timeout')
-        return 1000
+    except KeyError:
+        print(f'{workflow_name} JSON does not contain latency')
+    except ValueError:
+        print(rep.text)
+        print(f'{workflow_name} response could not be decoded as JSON')
+    except RequestException as e:
+        print(f'{workflow_name} request failed with exception: {e}')
+    except Exception as e:
+        print(f'{workflow_name} unexpected exception: {e}')
+
+    return 1000
 
 
-def analyze_azure_workflow(workflow_name, azure_data):
-    global e2e_dict
+def analyze_azure_workflow(workflow_name, azure_data, num_invos):
+    global completed_jobs
     id = str(uuid.uuid4())
     e2e_latency = run_workflow(workflow_name, id, azure_data)
-    e2e_dict[workflow_name] = e2e_latency
+    completed_jobs += 1
+    print(f"\r{completed_jobs}/{num_invos} of jobs are completed", end='', flush=True)
 
 
-def analyze(mode, results_dir, cache_data, azure_type=None):
+def analyze(mode, cache_data, azure_type=None):
     global e2e_dict
     workflow_pool = []
 
@@ -60,9 +77,9 @@ def analyze(mode, results_dir, cache_data, azure_type=None):
             # CPU function uses AzureFunction trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureFunction]
             azure = AzureFunction(workflow_info, azure_type)
-            num_invos = 800
+            num_invos = 2000
         elif AzureType.IO in azure_type:
-            num_invos = 10000
+            num_invos = 2000
             # I/O function uses AzureBlob trace
             workflow_info = workflow_infos[AzureTraceSlecter.AzureBlob]
             azure = AzureBlob(workflow_info, azure_type)
@@ -89,8 +106,9 @@ def analyze(mode, results_dir, cache_data, azure_type=None):
             azure_function_filtered = azure_function.filter_df(
                 app_map_dict=app_map_dict,
                 num_invos=num_invos,
-                mode=SamplingMode.Uniform
+                mode=SamplingMode.Sequantial
             )
+            azure_function.plot_RPS(azure_function_filtered.copy())
             if len(azure_function_filtered['func']) < len(eval_trace):
                 raise ValueError(
                     f"Not enough rows can be borrowed from AzureFunction trace, {len(eval_trace)} needed, only {len(azure_function_filtered['func'])} of rows ")
@@ -99,6 +117,7 @@ def analyze(mode, results_dir, cache_data, azure_type=None):
             eval_trace['func'] = azure_function_filtered['func']
             eval_trace['duration'] = azure_function_filtered['duration']
             eval_trace['app'] = azure_function_filtered['app']
+            eval_trace['invo_ts'] = azure_function_filtered['invo_ts']
 
         cnt = 0
         jobs = []
@@ -109,23 +128,32 @@ def analyze(mode, results_dir, cache_data, azure_type=None):
                 func_map_dict, app_map_dict, row, azure_type, cache_data)
             trace_time = max(start_ts_sec, trace_time)
             jobs.append(gevent.spawn_later(start_ts_sec, analyze_azure_workflow,
-                        workflow_name=workflow_name, azure_data=azure_data))
+                        workflow_name=workflow_name, azure_data=azure_data, num_invos=num_invos))
             workflow_pool.append(workflow_name)
             cnt += 1
             if cnt == num_invos:
                 break
 
-        print(cnt)
-        print(f"This experiment will be done in {trace_time/60} mins")
+        print(f"This experiment ({cnt} of invocations) will be done in {trace_time/60} mins")
         gevent.joinall(jobs)
+        print(Counter(AWS_HASH_KEY_COUNTER))
     
-    """
-    Container lifetime is set on function_group.py
-    The hit rate is automatically recorded for containers that reach the lifetime, 
-    but for containers that end the experiment but do not reach the lifetime, 
-    we actively record the hit ratio so that we can start the next experiment early.
-    """
-    requests.post(f'http://{config.MASTER_HOST}/finalize_hit_rate')
+    
+        """
+        Container lifetime is set on function_group.py
+        The hit rate is automatically recorded for containers that reach the lifetime, 
+        but for containers that end the experiment but do not reach the lifetime, 
+        we actively record the hit ratio so that we can start the next experiment early.
+        """
+            
+        """
+        Container lifetime is set on function_group.py
+        The hit rate is automatically recorded for containers that reach the lifetime, 
+        but for containers that end the experiment but do not reach the lifetime, 
+        we actively record the hit ratio so that we can start the next experiment early.
+        """
+        requests.post(f'http://{config.MASTER_HOST}/finalize_hit_rate')
+
 
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type, cache_data):
     invo_ts = row['invo_ts']
@@ -147,17 +175,15 @@ def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type, cache_data):
     elif AzureType.IO in azure_type:
         # I/O function uses AzureBlob trace
         addition_data = {
-            "cache_strategy": cache_data['cache_strategy'],
-            "cache_size": cache_data['cache_size'],
             "aws_boto3": {
+                "cache_strategy": cache_data['cache_strategy'],
+                "cache_size": cache_data['cache_size'],
                 "aws_access_key_id": f"{row['AnonUserId']}_key_id",
                 "aws_secret_access_key": f"{row['AnonUserId']}_access_key",
                 "region_name": f"{row['AnonRegion']}",
-                "bucket_name": f"{row['AnonBlobName']}{row['AnonBlobETag']}_name",
-                "bucket_key": f"{row['AnonBlobName']}{row['AnonBlobETag']}_key",
-                "read": row['Read']
             }
         }
+        AWS_HASH_KEY_COUNTER.append(utils.hash_string(str(addition_data.get("aws_boto3"))))
 
     azure_data.update(addition_data)
 
@@ -184,15 +210,11 @@ if __name__ == '__main__':
     results_dir = './results'
     os.system(f"mkdir -p {results_dir}")
     args = parse_args()
-    repo.clear_couchdb_results()
-    repo.clear_couchdb_workflow_latency()
     
     # Scheduling the cache items inside containers
     cache_data = {
         "cache_strategy": args.cache_strategy,
-        # If ${args.cache_size} is None, the cache size is set
-        # as the default value (see DEFAULT_CACHE_MAXLEN in src/azure_container/client_overhead/optimize/const.py)
         "cache_size": args.cache_size
     }
     print(cache_data)
-    analyze(args.mode, results_dir, cache_data, args.azure_type)
+    analyze(args.mode, cache_data, args.azure_type)
