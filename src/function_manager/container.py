@@ -121,7 +121,7 @@ class Container:
         data = {"cache_strategy": cache_strategy, "cache_size": cache_size}
         print(f"Setting cache info with: {data}")
         r = requests.post(base_url.format(
-            self.port, 'set_strategy'), json=data)
+            self.port, 'set_cache_config'), json=data)
         return r.status_code == 200
 
     # kill and remove the container
