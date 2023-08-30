@@ -202,25 +202,31 @@ class FaaSBatch(FunctionGroup):
         c_r_mapping = defaultdict(list)
         remaining_reqs = []
         # c_r_mapping = self.select_containers_by_aws_arguments(local_rq)
-        c_r_mapping, remaining_reqs = self.select_containers_by_hash_ring(local_rq)
+        c_r_mapping, remaining_reqs = self.select_containers_by_hash_ring(
+            local_rq)
 
-        # 用于存放需要额外处理的请求
-        extra_requests = []
+        # 初始化用于存放需要额外处理的请求的集合
+        extra_requests = set(remaining_reqs)
 
-        # 如果 c_r_mapping 为空，将 local_rq 添加到额外请求列表
         if not c_r_mapping:
             print("Failed to mapping requests in hashRing...")
-            extra_requests.extend(local_rq)
-
-        # 如果 remaining_reqs 不为空，将其添加到额外请求列表
-        if remaining_reqs:
-            extra_requests.extend(remaining_reqs)
+            extra_requests.update(local_rq)
 
         if extra_requests:
-            # Create or get containers
+            extra_requests = list(extra_requests)
+
             candidate_containers = self.dynamic_reactive_scaling(
                 function=function, local_rq=extra_requests)
-            c_r_mapping = self.normal_mapping(extra_requests, candidate_containers)
+            new_c_r_mapping = self.normal_mapping(
+                extra_requests, candidate_containers)
+
+            # 合并新旧映射
+            for container, requests in new_c_r_mapping.items():
+                if container in c_r_mapping:
+                    c_r_mapping[container].extend(requests)
+                else:
+                    c_r_mapping[container] = requests
+
         return c_r_mapping
 
     def execute_requests(self, c_r_mapping):
@@ -240,6 +246,8 @@ class FaaSBatch(FunctionGroup):
         c_r_mapping = {c: [] for c in candidate_containers}
         while local_rq:
             container = candidate_containers[idx]
+            print(
+                f"len(self.rq): {len(self.rq)}, len(local_rq): {len(local_rq)}")
             req = local_rq.pop(0)
             self.rq.remove(req)
             c_r_mapping[container].append(req)
