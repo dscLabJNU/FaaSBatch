@@ -153,6 +153,7 @@ class FaaSBatch(FunctionGroup):
             azure_data = req.data.get('azure_data', {})
             aws_boto3_argument = azure_data.get('aws_boto3', {})
             if not aws_boto3_argument:
+                # Skip CPU-intensive functions
                 continue
 
             hash_aws_arg = utils.hash_string(str(aws_boto3_argument))
@@ -188,12 +189,20 @@ class FaaSBatch(FunctionGroup):
             return
 
         function = local_rq[0].function
-        c_r_mapping = defaultdict(list)
+
         # Map reqeusts to containers and run them
+        c_r_mapping = self.mapping_invocations(local_rq, function)
+        threads = self.execute_requests(c_r_mapping)
+
+        # Record exec time, remove running requests, and put container to pool
+        # Note that one thread may contains several request results
+        self.finish_threads(threads)
+
+    def mapping_invocations(self, local_rq, function):
+        c_r_mapping = defaultdict(list)
+        remaining_reqs = []
         # c_r_mapping = self.select_containers_by_aws_arguments(local_rq)
-        c_r_mapping, remaining_reqs = self.select_containers_by_hash_ring(
-            local_rq)
-        print(f"remaining_reqs: {len(remaining_reqs)}")
+        c_r_mapping, remaining_reqs = self.select_containers_by_hash_ring(local_rq)
 
         # 用于存放需要额外处理的请求
         extra_requests = []
@@ -208,19 +217,11 @@ class FaaSBatch(FunctionGroup):
             extra_requests.extend(remaining_reqs)
 
         if extra_requests:
-            print(f"Failed to mapping requests in hashRing...")
             # Create or get containers
             candidate_containers = self.dynamic_reactive_scaling(
-                function=function, local_rq=local_rq)
-            c_r_mapping = self.normal_mapping(local_rq, candidate_containers)
-
-        for c, r in c_r_mapping.items():
-            print(f"Sending {r} to container {c.container.name}")
-        threads = self.execute_requests(c_r_mapping)
-
-        # Record exec time, remove running requests, and put container to pool
-        # Note that one thread may contains several request results
-        self.finish_threads(threads)
+                function=function, local_rq=extra_requests)
+            c_r_mapping = self.normal_mapping(extra_requests, candidate_containers)
+        return c_r_mapping
 
     def execute_requests(self, c_r_mapping):
         threads = []
