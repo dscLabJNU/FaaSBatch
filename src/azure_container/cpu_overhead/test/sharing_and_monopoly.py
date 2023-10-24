@@ -1,6 +1,7 @@
 from urllib import request
 from container import Container
 import docker
+import subprocess
 import os
 import time
 import threading
@@ -26,6 +27,7 @@ def parallel_create_containers(num_containers, image_name, port_base):
     print("Clearing previous containers.")
     os.system(
         'docker rm -f $(docker ps -aq --filter label=azure-cpu) >/dev/null 2>&1')
+    time.sleep(5)
     global containers
     containers = []
 
@@ -45,9 +47,10 @@ def invoke_container(container, reqs, log_file):
     res = container.send_batch_requests(data=reqs)
     print(res.values())
     for res_sub in list(res.values()):
-        print(res_sub)
+        # print(res_sub)
+        queue_time = res_sub.get("queue_time", 0)
         print(
-            f"{container.container.name},{res_sub['exec_time']}", file=log_file, flush=True)
+            f"{container.container.name},{res_sub['exec_time']},{queue_time}", file=log_file, flush=True)
     return res
 
 
@@ -103,10 +106,11 @@ if "__main__" == __name__:
     port_base = 8848
     modes = ['sharing', "monopoly"]
     concurrency_list = [10, 20, 40, 80, 160, 320, 640]
-    for mode in modes:
-        for N in concurrency_list:
+    for N in concurrency_list:
+        for mode in modes:
+            mem_log_file = open(f"../logs/{mode}_{N}_reqs_mem.csv", "w")
             log_file = open(f"../logs/{mode}_{N}_reqs.csv", 'w')
-            print("container_name,exec_time(ms)",
+            print("container_name,exec_time(ms),queue_time(ms)",
                   file=log_file, flush=True)
             if mode == 'sharing':
                 image_name = f"azure-cpu-optimize"
@@ -120,8 +124,12 @@ if "__main__" == __name__:
                 container_pool = parallel_create_containers(
                     image_name=image_name, num_containers=N, port_base=port_base)
 
+            subprocess.Popen(['bash', '-c', 
+                'cd /home/vagrant/openwhisk-resource-monitor/; bash monitor_resources.sh'], 
+                stdout=mem_log_file)
             print(f"{len(container_pool)} of containers have been created")
 
             # Maps N requests to the containers
             mapping_requests(
                 num_requests=N, container_pool=container_pool, log_file=log_file)
+            subprocess.run("ps -ef | grep -v grep |grep -E 'monitor_resources' | awk '{print $2}'| xargs kill -9", shell=True)
