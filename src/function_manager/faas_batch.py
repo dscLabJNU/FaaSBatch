@@ -162,10 +162,12 @@ class FaaSBatch(FunctionGroup):
                                                      cur_container_pool=self.container_pool,
                                                      cache_capacity=self.container_cache_capacity
                                                      )
-            if container:
+            # 如果不保证container在container_pool中，他就不会创建新的container，会一直使用normal_mapping的container到死！！！
+            if container and container in self.container_pool:
                 print(
                     f"Mapping {hash_aws_arg} to {container.container.name}")
                 c_r_mapping[container].append(req)
+                self.container_pool.remove(container)
                 req.cold_start = 0
             else:
                 remaining_request.append(req)
