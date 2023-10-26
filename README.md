@@ -37,10 +37,11 @@ Clone our code `https://github.com/dscLabJNU/FaaSBatch` and:
 5. To make sure the Python dependencies are well installed, run `pip3 install -r requirements.txt` in `~/batching-request/scripts`.
 
 6. On the storage node: Run `bash scripts/db_setup.bash`. It installs docker, CouchDB, and some python packages, and builds grouping results from the Azure benchmark. For the remaining dev, one can restart the cluster by running `bash scripts/db_restart.bash`.
-    
 
+7. On the worker node: Run `bash scripts/worker_setup.bash`. This installs docker, Redis, and some Python packages, and builds docker images from the Azure benchmark. Similarly, `bash scripts/worker_restart.sh` restarts the worker, it regenerates Azure trace, and rebuilds the container images.
 
-6. On the worker node: Run `bash scripts/worker_setup.bash`. This installs docker, Redis, and some Python packages, and builds docker images from the Azure benchmark. Similarly, `bash scripts/worker_restart.sh` restarts the worker, it regenerates Azure trace, and rebuilds the container images.
+8. Ensure SSH login communication (without password) is possible between the machines used for the experiment
+
 
 
 ## Run Experiment
