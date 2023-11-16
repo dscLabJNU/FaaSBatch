@@ -136,16 +136,8 @@ def analyze(mode, cache_data, azure_type=None):
 
         print(f"This experiment ({cnt} of invocations) will be done in {trace_time/60} mins")
         gevent.joinall(jobs)
-        print(Counter(AWS_HASH_KEY_COUNTER))
-    
-    
-        """
-        Container lifetime is set on function_group.py
-        The hit rate is automatically recorded for containers that reach the lifetime, 
-        but for containers that end the experiment but do not reach the lifetime, 
-        we actively record the hit ratio so that we can start the next experiment early.
-        """
-            
+        plot_PDF(Counter(AWS_HASH_KEY_COUNTER))
+               
         """
         Container lifetime is set on function_group.py
         The hit rate is automatically recorded for containers that reach the lifetime, 
@@ -153,6 +145,21 @@ def analyze(mode, cache_data, azure_type=None):
         we actively record the hit ratio so that we can start the next experiment early.
         """
         requests.post(f'http://{config.MASTER_HOST}/finalize_hit_rate')
+
+def plot_PDF(data: dict):
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({"axes.grid": True, 'grid.linestyle': '-.'})
+    fig, ax = plt.subplots(figsize=(5, 1.5))
+    sns.ecdfplot(data=data.values(), ax=ax, legend=False)
+
+    ax.set_xscale('log', base=10)
+    xticks_values = [1, 10, 10**2, 10**3, 10**4]
+    ax.set_xticks(xticks_values)
+    plt.xlabel("Amount of reqeusts", weight='bold', fontsize=12)
+    plt.ylabel("CDF", weight='bold', fontsize=12)
+    fig.savefig("imgs/AzureBlobRequestsPDF.pdf", bbox_inches='tight')
 
 
 def prepare_invo_info(func_map_dict, app_map_dict, row, azure_type, cache_data):
