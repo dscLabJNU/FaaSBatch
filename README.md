@@ -69,3 +69,18 @@ After that, all experimental results are stored in `results` folder.
 Just ignore the `amplication` in `latency_amplification`, this is a type mistake, and it actually shows the different types of latencies (scheduling_latency, cold_start latency, execution_latency, and queue_latency, also memory inside a container).
 
 For each of type of function (CPU and I/O), the corresponding result folders container the plot scripts (`plot_latency.ipynb`, `plot_provisioned_container.ipynb`, and `plot_utilization.ipynb`)
+
+## Cite
+```bibTex
+@ARTICLE{wu2024FaaSBatch,
+  author={Wu, Zhaorui and Deng, Yuhui and Zhou, Yi and Li, Jie and Pang, Shujie and Qin, Xiao},
+  journal={IEEE Transactions on Computers}, 
+  title={FaaSBatch: Boosting Serverless Efficiency With In-Container Parallelism and Resource Multiplexing}, 
+  year={2024},
+  volume={73},
+  number={4},
+  pages={1071-1085},
+  doi={10.1109/TC.2024.3352834
+}
+
+```
